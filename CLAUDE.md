@@ -57,9 +57,11 @@ prioridade). **Não há cálculo local e não há leitura de nenhuma base de dad
   `Authorization` (sem "Bearer"). Depois `GET /calcPU/{ticker}/{data}/{taxa}` (→ campo `PU`,
   `PUPar`, `duration`) e `GET /calcYield/{ticker}/{data}/{pu}` (→ campo `yield`). Token cacheado,
   renova em 401.
-- **FI Analytics**: `POST /deb/debenturecalculator` com header `x-api-key: <token_fianalytics>`.
-  Resposta é **double-encoded** (JSON dentro de string). Modo `rate` → `m2m`/`maculayDuration`;
-  modo `pu` → `m2mRate`.
+- **FI Analytics**: `POST` com header `x-api-key: <token_fianalytics>`. Dois endpoints com a MESMA
+  resposta: `/deb/debenturecalculator` (debêntures) e `/cr/cricracalculator` (CRI/CRA). O `apis.py`
+  tenta o de debênture e, se não vier resultado (ex.: ticker é CRA), tenta o de CRI/CRA
+  (`_PostFiAuto`). Resposta é **double-encoded** (JSON dentro de string). Modo `rate` →
+  `m2m`/`maculayDuration`; modo `pu` → `m2mRate`.
 - Datas para a API: formato `YYYY-MM-DD`. No Excel entram como `dd/mm/yyyy` ou data nativa.
 - Cache em memória por `(origem, ticker, data, taxa/pu)`, inclusive resultados `None`, para não
   martelar a rede a cada recálculo. `=LIMPARCACHE()` limpa.

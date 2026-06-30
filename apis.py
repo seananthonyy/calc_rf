@@ -35,6 +35,7 @@ ENV_PROXY_HTTPS = "proxy_https"
 B3_BASE      = "https://api.calculadorarendafixa.com.br"
 FI_BASE      = "https://endpoint.fi-analytics.com.br"
 FI_DEB_PATH  = "/deb/debenturecalculator"
+FI_CR_PATH   = "/cr/cricracalculator"   # CRI/CRA (mesmos campos da resposta)
 TIMEOUT_SEG  = 6  # timeout curto por chamada para não travar o Excel
 
 _CACHE_AUSENTE = object()
@@ -195,14 +196,14 @@ def TaxaB3(ticker, dataIso, pu):
 # FI Analytics
 # -----------------------------------------------------------------------------
 
-def _PostFi(corpo):
-    """POST no debenturecalculator. Resposta é double-encoded. dict ou None."""
+def _PostFi(corpo, path=FI_DEB_PATH):
+    """POST num endpoint FI. Resposta é double-encoded. dict ou None."""
     chave = _Cred(ENV_KEY_FI, "FIANALYTICS_API_KEY")
     if not chave:
         return None
     try:
         req = urllib.request.Request(
-            f"{FI_BASE}{FI_DEB_PATH}",
+            f"{FI_BASE}{path}",
             data=json.dumps(corpo).encode(),
             headers={"Content-Type": "application/json; charset=utf-8", "x-api-key": chave},
             method="POST",
@@ -214,6 +215,18 @@ def _PostFi(corpo):
         return None
 
 
+def _PostFiAuto(corpo):
+    """Tenta debênture; se não for (ex.: CRI/CRA), tenta o endpoint de CRI/CRA.
+    Os dois endpoints devolvem os mesmos campos (m2m, m2mRate, ...)."""
+    for path in (FI_DEB_PATH, FI_CR_PATH):
+        dados = _PostFi(corpo, path)
+        if isinstance(dados, dict) and (
+            dados.get("m2m") is not None or dados.get("m2mRate") is not None
+        ):
+            return dados
+    return None
+
+
 def PrecoFi(ticker, dataIso, taxa):
     """Modo rate → {'pu': m2m, 'duration': maculayDuration anos|None} ou None."""
     taxa = _Norm(taxa)
@@ -222,7 +235,7 @@ def PrecoFi(ticker, dataIso, taxa):
     if cacheado is not _CACHE_AUSENTE:
         return cacheado
 
-    dados = _PostFi({"ticker": ticker, "date": dataIso, "rate": float(taxa)})
+    dados = _PostFiAuto({"ticker": ticker, "date": dataIso, "rate": float(taxa)})
     resultado = None
     if isinstance(dados, dict):
         pu    = dados.get("m2m")
@@ -246,7 +259,7 @@ def TaxaFi(ticker, dataIso, pu):
     if cacheado is not _CACHE_AUSENTE:
         return cacheado
 
-    dados = _PostFi({"ticker": ticker, "date": dataIso, "pu": float(pu)})
+    dados = _PostFiAuto({"ticker": ticker, "date": dataIso, "pu": float(pu)})
     resultado = None
     if isinstance(dados, dict):
         taxa = dados.get("m2mRate")
