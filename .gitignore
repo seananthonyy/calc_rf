@@ -1,0 +1,13 @@
+# Segredos / ambiente — NUNCA versionar (vêm de variáveis de ambiente)
+.env
+*.env
+
+# Locks e temporários do Excel (guardam nome de usuário)
+~$*
+
+# Python
+__pycache__/
+*.pyc
+
+# Artefato temporário do processo de higienização do .xlam
+*.clean.xlam
