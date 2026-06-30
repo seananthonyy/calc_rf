@@ -56,7 +56,10 @@ prioridade). **Não há cálculo local e não há leitura de nenhuma base de dad
 - **B3 Calculator**: login em `POST /login` com `{"token": <token_calc_b3>}` → devolve um
   `Authorization` (sem "Bearer"). Depois `GET /calcPU/{ticker}/{data}/{taxa}` (→ campo `PU`,
   `PUPar`, `duration`) e `GET /calcYield/{ticker}/{data}/{pu}` (→ campo `yield`). Token cacheado,
-  renova em 401.
+  renova em 401. **Tickers de título público**: o `apis.py` normaliza nome amigável → código CETIP
+  via `_NormalizarTicker` antes de chamar a B3 (`NTNB35`/`NTN-B 35` → `76019920350515`; ano par→
+  ago/15, ímpar→mai/15; `NTNF27` → `95019920270101`). Código cetip já pronto passa inalterado.
+  Validado: B3 e FI gov dão o MESMO PU (NTNB35 @7% = 4486,066906).
 - **FI Analytics**: `POST` com header `x-api-key: <token_fianalytics>`. Dois endpoints com a MESMA
   resposta: `/deb/debenturecalculator` (debêntures) e `/cr/cricracalculator` (CRI/CRA). O `apis.py`
   tenta o de debênture e, se não vier resultado (ex.: ticker é CRA), tenta o de CRI/CRA

@@ -16,6 +16,7 @@
 # =============================================================================
 
 import os
+import re
 import json
 import urllib.request
 import urllib.error
@@ -150,8 +151,30 @@ def _GetB3(url):
     return None
 
 
+_RE_NTNB = re.compile(r"^NTN-?B\s*(\d{2})$")
+_RE_NTNF = re.compile(r"^NTN-?F\s*(\d{2})$")
+
+
+def _NormalizarTicker(ticker):
+    """Converte nome amigável de título público no código CETIP da B3.
+    NTN-B (Tesouro IPCA+): vence dia 15; ano par→ago(08), ímpar→mai(05) → 760199{ano}{mmdd}.
+    NTN-F (Tesouro Prefixado): vence 01/01 → 950199{ano}0101.
+    Aceita 'NTNB35', 'NTN-B 35', 'NTN-B35'. Demais tickers passam inalterados (ex.: código
+    cetip já pronto, debênture, CRA)."""
+    t = str(ticker).upper().strip()
+    m = _RE_NTNB.match(t)
+    if m:
+        ano = 2000 + int(m.group(1))
+        return f"760199{ano}{'0815' if ano % 2 == 0 else '0515'}"
+    m = _RE_NTNF.match(t)
+    if m:
+        return f"950199{2000 + int(m.group(1))}0101"
+    return t
+
+
 def PrecoB3(ticker, dataIso, taxa):
     """calcPU → {'pu': float, 'duration': anos|None} ou None. taxa em % a.a."""
+    ticker = _NormalizarTicker(ticker)
     taxa = _Norm(taxa)
     chaveCache = ("b3pu", ticker, dataIso, taxa)
     cacheado = _cacheRespostas.get(chaveCache, _CACHE_AUSENTE)
@@ -176,6 +199,7 @@ def PrecoB3(ticker, dataIso, taxa):
 
 def TaxaB3(ticker, dataIso, pu):
     """calcYield → yield em % a.a. ou None."""
+    ticker = _NormalizarTicker(ticker)
     pu = _Norm(pu)
     chaveCache = ("b3yield", ticker, dataIso, pu)
     cacheado = _cacheRespostas.get(chaveCache, _CACHE_AUSENTE)
