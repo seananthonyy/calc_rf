@@ -4,9 +4,12 @@ Documentação técnica para o Claude Code. Leia antes de alterar qualquer coisa
 
 ## O que é
 
-Add-in de Excel que expõe 3 funções de planilha (UDFs) para precificar títulos de renda fixa,
-**buscando os números exclusivamente nas APIs** (B3 Calculator → FI Analytics, nessa ordem de
-prioridade). **Não há cálculo local e não há leitura de nenhuma base de dados** — só chamadas HTTP.
+Add-in de Excel que expõe 3 funções de planilha (UDFs) para precificar títulos de renda fixa.
+- **Títulos com API** (debênture, CRI/CRA, NTN-B/NTN-F): números vêm das APIs (B3 Calculator →
+  FI Analytics, nessa ordem). Sem leitura de base de dados local.
+- **DI (tickers `DI1...`)**: NÃO existe API → calculado **localmente** em `di.py` (contagem de dias
+  úteis + `feriados_anbima.csv`). O `calcrf_addin.py` roteia: se `di.EhTickerDi(ticker)` → local,
+  senão → APIs.
 
 | UDF no Excel | Retorno |
 |---|---|
@@ -29,8 +32,10 @@ prioridade). **Não há cálculo local e não há leitura de nenhuma base de dad
 ### Arquivos
 | Arquivo | Papel | Mexe? |
 |---|---|---|
-| `calcrf_addin.py` | as UDFs (decoradas com `@xw.func`). Importa de `apis.py`. | sim — lógica das funções |
-| `apis.py` | cliente HTTP B3/FI (urllib, stdlib). Segredos + proxy + cache. | sim — APIs, proxy, parsing |
+| `calcrf_addin.py` | as UDFs (`@xw.func`). Roteia DI→`di.py`, resto→`apis.py`. | sim — lógica das funções |
+| `apis.py` | cliente HTTP B3/FI (urllib, stdlib). Segredos + proxy + cache + normaliza NTN-B/F. | sim — APIs, proxy, parsing |
+| `di.py` | cálculo LOCAL de DI (DI1...). Self-contained (lê `feriados_anbima.csv`). | sim — fórmula/calendário DI |
+| `feriados_anbima.csv` | calendário de feriados (usado pelo `di.py`). | só ao estender datas |
 | `config.py` | só `ENV_PATH` (fallback de dev). | raramente |
 | `calcrf_addin.xlam` | o add-in. Binário. | só ao mudar nome/assinatura de UDF (ver abaixo) |
 
@@ -134,7 +139,8 @@ Reiniciar o Excel após qualquer um dos dois.
 2. **NENHUM dado sensível** em arquivo: nada de tokens, senhas, e-mails, caminhos pessoais,
    identificadores de máquina/usuário. Segredos vêm SÓ de variáveis de ambiente. Antes de
    entregar/alterar, varra a pasta atrás de valores reais de credenciais e remova.
-3. Não reintroduza dependência de base local (trades.db) nem cálculo local — o add-in é só API.
+3. Não reintroduza dependência de base local (trades.db) nem a calculadora ANBIMA. **Exceção:** o
+   DI é calculado localmente em `di.py` (não existe API de DI) — isso é intencional e permitido.
 4. `apis.py` usa só a stdlib (urllib). Evite adicionar dependências (mantém o deploy leve).
 
 ## Teste rápido (sanity)

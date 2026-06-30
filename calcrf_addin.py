@@ -11,11 +11,12 @@ from datetime import datetime, date as date_type
 import xlwings as xw
 
 # Captura qualquer erro de import para exibir na célula.
-# O add-in usa SOMENTE as APIs (B3 / FI Analytics) — sem calculadora local e
-# sem leitura de qualquer base nossa (trades.db).
+# Títulos com API (debênture, CRI/CRA, NTN-B…): via B3 → FI Analytics.
+# DI (tickers DI1...): NÃO há API → calculado LOCALMENTE em di.py.
 _IMPORT_ERROR = None
 try:
     from apis import PrecoB3, TaxaB3, PrecoFi, TaxaFi, LimparCache
+    import di
 except Exception as _e:
     _IMPORT_ERROR = str(_e)
 
@@ -70,6 +71,9 @@ def PU(ticker, data, taxa):
         dataIso = _data_iso(data)
         taxaPct = _pct(taxa)
 
+        if di.EhTickerDi(ticker):
+            return float(di.PuDi(taxaPct, _parse_data(data), ticker))
+
         resp = PrecoB3(ticker, dataIso, taxaPct) or PrecoFi(ticker, dataIso, taxaPct)
         if resp and resp.get("pu") is not None:
             return float(resp["pu"])
@@ -92,6 +96,9 @@ def DUR(ticker, data, taxa):
         dataIso = _data_iso(data)
         taxaPct = _pct(taxa)
 
+        if di.EhTickerDi(ticker):
+            return float(di.DurationDi(_parse_data(data), ticker))
+
         resp = PrecoB3(ticker, dataIso, taxaPct) or PrecoFi(ticker, dataIso, taxaPct)
         if resp and resp.get("duration") is not None:
             return float(resp["duration"])
@@ -113,6 +120,9 @@ def TAXA(ticker, data, pu):
         ticker  = str(ticker).upper().strip()
         dataIso = _data_iso(data)
         puFloat = float(pu)
+
+        if di.EhTickerDi(ticker):
+            return float(di.TaxaDi(puFloat, _parse_data(data), ticker)) / 100
 
         taxa = TaxaB3(ticker, dataIso, puFloat)
         if taxa is None:
