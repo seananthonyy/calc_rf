@@ -86,6 +86,11 @@ prioridade). **Não há cálculo local e não há leitura de nenhuma base de dad
 
 ## Planilha do SharePoint/OneDrive CONGELA o Excel ao usar uma UDF
 
+> ✅ **JÁ APLICADO neste `.xlam`** (30/06): o sheet `myaddin.conf` embutido tem
+> `ADD_WORKBOOK_TO_PYTHONPATH=false` e `PYTHONPATH=Z:\AntonioOliveira\CalcRF`. Funciona com o
+> add-in carregado **desse caminho fixo**. Se a pasta mudar, edite o valor de `PYTHONPATH` no
+> sheet `myaddin.conf` (ou via o script `scratchpad/bake_config.py`). Abaixo, a explicação/teoria.
+
 **Sintoma:** numa planilha aberta do SharePoint/OneDrive (cujo `Workbook.FullName` é uma URL
 `https://...`), qualquer fórmula do add-in trava o Excel. Em planilha local, funciona normal.
 
