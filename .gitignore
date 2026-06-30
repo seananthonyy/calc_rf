@@ -14,3 +14,4 @@ __pycache__/
 
 # Artefato temporário do processo de higienização do .xlam
 *.clean.xlam
+calcrf_addin_DEV.xlam
