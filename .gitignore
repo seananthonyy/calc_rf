@@ -2,6 +2,9 @@
 .env
 *.env
 
+# Override de dev local (aponta p/ um .env fora do repo) — nunca versionar
+config_local.py
+
 # Locks e temporários do Excel (guardam nome de usuário)
 ~$*
 

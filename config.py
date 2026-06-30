@@ -11,4 +11,14 @@
 
 import os
 
+# Fallback de dev: por padrão procura um .env na própria pasta (não versionado).
 ENV_PATH = os.path.join(os.path.dirname(__file__), ".env")
+
+# Override de desenvolvimento LOCAL (fora do versionamento): para apontar a um
+# .env FORA da pasta do repo, crie um config_local.py (gitignored) com:
+#     ENV_PATH = r"C:\caminho\para\.env"
+# No banco isso não existe e os segredos vêm das variáveis de ambiente.
+try:
+    from config_local import ENV_PATH  # noqa: F811
+except Exception:
+    pass
