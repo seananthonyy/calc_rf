@@ -84,6 +84,42 @@ prioridade). **Não há cálculo local e não há leitura de nenhuma base de dad
 3. **Salve o `.xlam`** (Ctrl+S no editor VBA). Distribua o `.xlam` novo.
    Requer "Confiar no acesso ao modelo de objeto do VBA" ligado.
 
+## Planilha do SharePoint/OneDrive CONGELA o Excel ao usar uma UDF
+
+**Sintoma:** numa planilha aberta do SharePoint/OneDrive (cujo `Workbook.FullName` é uma URL
+`https://...`), qualquer fórmula do add-in trava o Excel. Em planilha local, funciona normal.
+
+**Causa:** com `ADD_WORKBOOK_TO_PYTHONPATH` ligado (padrão), o xlwings (`prepare_sys_path` →
+`fullname_url_to_local_path`) tenta **mapear a URL do arquivo para um caminho local**, e essa busca
+no sistema de arquivos trava.
+
+**Fix (2 chaves de config do xlwings):**
+```
+ADD_WORKBOOK_TO_PYTHONPATH = false   # não tenta resolver a URL → não trava
+PYTHONPATH = <pasta do add-in>       # re-adiciona a pasta dos .py (o item acima a removeria)
+```
+
+**Onde colocar — duas formas:**
+
+1. **Por usuário** — arquivo `%USERPROFILE%\.myaddin\myaddin.conf` (PROJECT_NAME do addin =
+   `myaddin`), formato `"Chave","Valor"`:
+   ```
+   "ADD_WORKBOOK_TO_PYTHONPATH","false"
+   "PYTHONPATH","C:\caminho\para\calcrf_addin"
+   ```
+   Implantar via login script / GPO, ou criar à mão. Simples, mas é um arquivo por usuário.
+
+2. **Para todos (rollout)** — embutir essas 2 linhas num **sheet `myaddin.conf` dentro do `.xlam`**
+   (precisa abrir o `.xlam` no Excel uma vez e adicionar o sheet). Para o `PYTHONPATH` valer em
+   qualquer máquina, use uma **variável de ambiente** (o xlwings expande com `os.path.expandvars`):
+   `"PYTHONPATH","%CALCRF_DIR%"`, e cada máquina seta `CALCRF_DIR` = pasta do add-in (junto com os
+   demais env vars). Assim o `.xlam` é uniforme e zero config por usuário.
+
+> Numa **share de rede** (UNC igual p/ todos), pode-se fixar o caminho direto no `PYTHONPATH`
+> (sem env var), já que é o mesmo para todos.
+
+Reiniciar o Excel após qualquer um dos dois.
+
 ## ⚠️ REGRAS DESTA PASTA (deploy para o banco)
 
 1. **NENHUM arquivo `.bat`** nesta pasta. Nunca crie scripts `.bat` aqui.
