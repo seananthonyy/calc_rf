@@ -125,7 +125,8 @@ O `.xlam` fica **travado enquanto algum Excel o tiver aberto** — troque fora d
 | `ERRO: APIs sem resposta (B3/FI)` | faltam env vars / proxy | passo 3 |
 | `Input past end of file` | `myaddin.conf` com linha em branco sobrando | `CONFIGURAR_PYTHON.md` |
 | aba CalcRF não aparece / `#NAME?` | add-in não habilitado ou VBA não liberado | passos 4 e 5 |
-| Excel congela em planilha do SharePoint | (já mitigado no `.xlam`) | ver `CLAUDE.md` |
+| Excel congela ao abrir planilha do SharePoint | resolução de URL do PYTHONPATH | (já mitigado no `.xlam`) ver `CLAUDE.md` |
+| célula piscando / recálculo em loop no SharePoint (arg vindo de XLOOKUP) | UDF assíncrona fazia write-back → loop | (já corrigido: UDFs síncronas) atualizar `.xlam`+`.py`; paliativo: cálculo Manual/F9. Ver `CLAUDE.md` |
 
 ---
 

@@ -24,6 +24,10 @@ Depois de instalado, a aba do ribbon aparece como **CalcRF**.
 | `=TESTE()` | Diagnóstico ("OK — path: ...") |
 | `=LIMPARCACHE()` | Esvazia o cache de respostas das APIs |
 
+> **PU/DUR/TAXA são SÍNCRONAS de propósito** (decorador `@xw.func`, sem `async_mode`). Já foram
+> assíncronas (`async_mode='threading'`), mas isso causava **recálculo em loop no SharePoint** — ver
+> seção "SharePoint: recálculo em loop" abaixo. **Não** reintroduza async sem entender esse trade-off.
+
 ## Arquitetura
 
 É um **add-in customizado do xlwings** (gerado por `xlwings quickstart ... --addin --ribbon`):
@@ -90,12 +94,37 @@ Depois de instalado, a aba do ribbon aparece como **CalcRF**.
    (≈ 961,70 para esse caso).
 3. O usuário pega a mudança ao **reabrir o Excel** (o Python recarrega o módulo no novo processo).
 
-### Adicionar/renomear UDF ou mudar argumentos — precisa reimportar no `.xlam`
-1. Edite as funções em `calcrf_addin.py` (mantenha o decorador `@xw.func`).
-2. No Excel, com o add-in carregado: **Alt+F11** → módulo `xlwings` do projeto `calcrf_addin.xlam`
-   → rode a sub **`ImportPythonUDFsToAddin`** (F5). Isso regenera o módulo `xlwings_udfs`.
-3. **Salve o `.xlam`** (Ctrl+S no editor VBA). Distribua o `.xlam` novo.
-   Requer "Confiar no acesso ao modelo de objeto do VBA" ligado.
+### Adicionar/renomear UDF, mudar argumentos, ou trocar sync↔async — precisa RE-GERAR o `.xlam`
+O módulo `xlwings_udfs` (as casquinhas VBA) é **baked no `.xlam`** e difere conforme a assinatura e o
+`async_mode` das funções (ver `udfs.py`, `generate_vba_wrapper`, ~linha 515). Então mudar isso exige
+regenerar o `xlwings_udfs`. Duas formas:
+
+**(1) Manual, no Excel:** com o add-in carregado, **Alt+F11** → módulo `xlwings` do projeto
+`calcrf_addin.xlam` → rode a sub **`ImportPythonUDFsToAddin`** (F5) → **Ctrl+S**. Requer "Confiar no
+acesso ao modelo de objeto do VBA" ligado.
+
+**(2) Via COM, do Python (sem Alt+F11) — foi como o re-bake síncrono foi feito (01/07):**
+chama-se a MESMA função que a sub VBA chama (`xlwings.udfs.import_udfs`). Esqueleto:
+```python
+import sys, xlwings as xw
+from xlwings import udfs
+sys.path.insert(0, r"<pasta com calcrf_addin.py>")   # p/ import_udfs achar o modulo
+app = xw.App(visible=True, add_book=False); app.display_alerts = False
+wb = app.books.open(r"<...>\calcrf_addin.xlam")
+wb.api.IsAddin = False        # ⚠️ senao MacroOptions falha: "Cannot edit a macro on a hidden workbook"
+udfs.import_udfs("calcrf_addin", wb.api)   # = ImportPythonUDFsToAddin (addin:=True -> ThisWorkbook)
+wb.api.IsAddin = True; wb.save(); wb.close(); app.quit()
+```
+Só o `xl/vbaProject.bin` muda.
+
+> ⚠️ **PII ao salvar no Excel:** o save injeta `C:\Users\<voce>\...` no `vbaProject.bin` (ascii **e**
+> utf-16-le) e o seu nome no `docProps`. Como o repo é público (ver regras abaixo), **scrub antes de
+> commitar**: substitua `<seu-usuario>`→`user1` no `vbaProject.bin` (mesmo tamanho, preserva offsets).
+> Estratégia usada p/ o PROD: re-bakear num `.xlam` de dev (config local), depois **transplantar só o
+> `vbaProject.bin` síncrono+scrubbado** para o `calcrf_addin.xlam` de produção (que mantém o
+> `docProps=CalcRF` e a config `Z:\` limpos). Assim o PROD nunca reabre no Excel → não pega PII nova.
+
+3. Distribua o `.xlam` novo (commit + o banco dá `git pull`). No banco, reabrir o Excel basta.
 
 ## Planilha do SharePoint/OneDrive CONGELA o Excel ao usar uma UDF
 
@@ -145,6 +174,25 @@ Reiniciar o Excel após qualquer um dos dois.
 > prática: o sheet embutido traz `Interpreter_Win` **vazio**, então para fixar o Python por PC via
 > arquivo do usuário use a chave legada **`Interpreter`** (que não está no sheet) — não
 > `Interpreter_Win`. Ver `CONFIGURAR_PYTHON.md`.
+
+## SharePoint: recálculo em LOOP (célula piscando / Excel travado)
+
+> ✅ **JÁ CORRIGIDO (01/07):** as UDFs viraram síncronas. Esta seção explica o porquê — não é o mesmo
+> problema do "congela ao abrir" acima (aquele era resolução de URL do PYTHONPATH).
+
+**Sintoma:** numa planilha do SharePoint, `=PU/=DUR/=TAXA` **funcionam** quando os argumentos são
+digitados; mas quando o ticker (ou a data) vem de uma **fórmula viva** (ex.: `XLOOKUP`), a célula fica
+**recalculando sem parar** (valor piscando) e o Excel trava.
+
+**Causa:** as funções eram **assíncronas** (`async_mode='threading'`). Async roda em thread e
+**escreve o resultado de volta** na célula; essa escrita conta como mudança e **dispara um
+recálculo**. Com argumento constante a cadeia estabiliza; mas com um `XLOOKUP` alimentando o argumento,
+a escrita re-dispara o XLOOKUP → re-dispara a UDF → escreve de novo → **loop infinito**. O cache do
+`apis.py` não ajuda porque o que fica em loop é o *recálculo*, não a rede.
+
+**Correção:** tornar PU/DUR/TAXA **síncronas** (remover `async_mode` → `@xw.func`). Sem write-back, não
+há loop; e o cache mantém rápido (rede só na 1ª vez por input). Exigiu re-gerar o `.xlam` (ver "Como
+ALTERAR" (2)). Paliativo enquanto não atualiza: cálculo em **Manual (F9)**.
 
 ## ⚠️ REGRAS DESTA PASTA (deploy para o banco)
 
