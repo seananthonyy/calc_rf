@@ -57,12 +57,15 @@ def TESTE():
     return f"OK — path: {_THIS_DIR}"
 
 
-@xw.func(async_mode='threading')
+@xw.func
 @xw.arg('taxa', numbers=float)
 def PU(ticker, data, taxa):
     """PU de Operação. taxa como % no Excel (ex: 6,4618%).
 
     Fonte: B3 → FI Analytics (nesta ordem). Sem fallback local.
+    Síncrona (não-async) de propósito: async fazia write-back que disparava recálculo
+    em loop quando o argumento vinha de fórmula viva (XLOOKUP) em planilha do SharePoint.
+    O cache de respostas em apis.py evita travar (só bate na rede na 1ª vez por input).
     """
     if _IMPORT_ERROR:
         return f"ERRO import: {_IMPORT_ERROR}"
@@ -82,7 +85,7 @@ def PU(ticker, data, taxa):
         return f"ERRO: {e}"
 
 
-@xw.func(async_mode='threading')
+@xw.func
 @xw.arg('taxa', numbers=float)
 def DUR(ticker, data, taxa):
     """Duration Macaulay em anos. taxa como % no Excel.
@@ -107,7 +110,7 @@ def DUR(ticker, data, taxa):
         return f"ERRO: {e}"
 
 
-@xw.func(async_mode='threading')
+@xw.func
 @xw.arg('pu', numbers=float)
 def TAXA(ticker, data, pu):
     """Taxa de negociação dado PU Op (retorna decimal para formatar como %).
