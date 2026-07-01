@@ -1,8 +1,13 @@
 # Add-in CalcRF — instalação e atualização (guia humano)
 
-Add-in Excel **API-only** (B3 → FI Analytics). Empacotado como add-in customizado do xlwings:
-um único `.xlam` que disponibiliza as UDFs `=PU`, `=DUR`, `=TAXA` em **qualquer planilha**, sem
-"Import Functions" por workbook. (Detalhe técnico/arquitetura para alterações: ver `CLAUDE.md`.)
+Add-in Excel de renda fixa. Preços vêm das APIs (B3 → FI Analytics) para debênture/CRI/CRA/
+NTN-B/NTN-F; **DI (`DI1...`) é calculado localmente** (não há API de DI). Empacotado como add-in
+customizado do xlwings: um único `.xlam` que disponibiliza as UDFs `=PU`, `=DUR`, `=TAXA` (+ `=TESTE`,
+`=LIMPARCACHE`) em **qualquer planilha**, sem "Import Functions" por workbook. Depois de instalado,
+aparece a aba **CalcRF** no ribbon.
+
+> **Instalar/configurar no banco:** siga o `INSTALAR_NO_BANCO.md` (passo a passo completo).
+> Fixar o Python por PC: `CONFIGURAR_PYTHON.md`. Arquitetura/como alterar: `CLAUDE.md`.
 
 ## Conteúdo da pasta
 

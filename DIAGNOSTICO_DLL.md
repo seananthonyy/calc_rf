@@ -68,10 +68,17 @@ pip install --force-reinstall --proxy http://USUARIO:SENHA@HOST:PORTA "xlwings==
 ### Caso B — apontar o add-in para o Python real
 Crie/edite o arquivo `%USERPROFILE%\.myaddin\myaddin.conf` com:
 ```
-"Interpreter_Win","C:\caminho\real\PythonXX\pythonw.exe"
+"Interpreter","C:\caminho\real\PythonXX\pythonw.exe"
 ```
 Use o **mesmo** Python onde o `xlwings==0.36.6` está instalado (o da raiz que tem a DLL).
 (O nome `myaddin` é o PROJECT_NAME interno do add-in; é proposital.)
+
+> ⚠️ **Use a chave `Interpreter`, NÃO `Interpreter_Win`.** O `.xlam` traz `Interpreter_Win` **vazio**
+> na planilha de config embutida, e essa planilha tem **precedência** sobre o arquivo do usuário —
+> então `Interpreter_Win` no arquivo seria ignorado. A chave legada `Interpreter` não está na
+> planilha embutida, então é a que "passa" para o arquivo do usuário. (No VBA: `INTERPRETER_WIN`
+> vazio → cai em `GetConfig("INTERPRETER","pythonw")`, que lê o arquivo; chave é case-insensitive.)
+> Detalhes e snippet seguro (encoding/sem newline final) em `CONFIGURAR_PYTHON.md`.
 
 ### Caso C — copiar a DLL para a raiz do Python
 ```bash

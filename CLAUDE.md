@@ -2,9 +2,14 @@
 
 Documentação técnica para o Claude Code. Leia antes de alterar qualquer coisa nesta pasta.
 
+> **Mapa dos docs desta pasta:** instalar/configurar no banco → `INSTALAR_NO_BANCO.md`; fixar o
+> Python por PC → `CONFIGURAR_PYTHON.md`; erro de DLL → `DIAGNOSTICO_DLL.md`; visão geral p/ humano
+> → `LEIA-ME.md`; arquitetura/como alterar (este) → `CLAUDE.md`.
+
 ## O que é
 
-Add-in de Excel que expõe 3 funções de planilha (UDFs) para precificar títulos de renda fixa.
+Add-in de Excel que expõe 5 funções de planilha (UDFs) para precificar títulos de renda fixa.
+Depois de instalado, a aba do ribbon aparece como **CalcRF**.
 - **Títulos com API** (debênture, CRI/CRA, NTN-B/NTN-F): números vêm das APIs (B3 Calculator →
   FI Analytics, nessa ordem). Sem leitura de base de dados local.
 - **DI (tickers `DI1...`)**: NÃO existe API → calculado **localmente** em `di.py` (contagem de dias
@@ -132,6 +137,14 @@ PYTHONPATH = <pasta do add-in>       # re-adiciona a pasta dos .py (o item acima
 > (sem env var), já que é o mesmo para todos.
 
 Reiniciar o Excel após qualquer um dos dois.
+
+> ⚠️ **Precedência da config (importa muito):** o VBA (`GetConfig` em `xlwings_custom_addin.bas`)
+> lê nesta ordem: sheet do workbook ativo → **sheet embutido do `.xlam`** → arquivo do diretório →
+> arquivo do usuário `%USERPROFILE%\.myaddin\myaddin.conf`. Uma chave que **existe** no sheet
+> embutido (mesmo com valor vazio) **curto-circuita** e ignora o arquivo do usuário. Consequência
+> prática: o sheet embutido traz `Interpreter_Win` **vazio**, então para fixar o Python por PC via
+> arquivo do usuário use a chave legada **`Interpreter`** (que não está no sheet) — não
+> `Interpreter_Win`. Ver `CONFIGURAR_PYTHON.md`.
 
 ## ⚠️ REGRAS DESTA PASTA (deploy para o banco)
 
