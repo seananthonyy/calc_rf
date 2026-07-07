@@ -89,15 +89,20 @@ Depois de instalado, a aba do ribbon aparece como **AntonioOliveiraCalc**.
 - **Cache em disco (TTL)** — `_CacheSet`/`_Persistir`/`_CarregarCacheDisco`: só resultados VÁLIDOS
   (nunca `None`/erro) vão p/ `%TEMP%\calcrf_cache.json`, com validade `CACHE_TTL_SEG` (600 s).
   Sobrevive a reabrir o Excel; fora do TTL, refaz a chamada. Escrita atômica, falha de I/O ignorada.
-- **Memo de fonte por ticker** — `_fonteTicker` (`Preco`/`TaxaOp`): lembra se B3 ou FI respondeu o
-  ticker (só em sucesso) e tenta essa primeiro; SEMPRE mantém o fallback (só reordena).
+- **Memo de fonte por ticker** — `_fonteTicker` (`Preco`/`TaxaOp`): lembra se B3, FI ou bondbuilder
+  respondeu o ticker (só em sucesso) e tenta essa primeiro; SEMPRE mantém o fallback (só reordena).
 - **Circuit-breaker por base** — `_Abrir`/`_EmCooldown` (`COOLDOWN_SEG=20`): timeout/erro de REDE
   numa base (B3/FI) marca-a indisponível por 20 s → chamadas seguintes fast-fail sem tocar a rede
   (num storm de recálculo só a 1ª célula paga o timeout). HTTP 400/404 NÃO derruba (base no ar).
 - **Token B3** obtido 1×, reusado, renova em 401.
 - `=LIMPARCACHE()` limpa tudo: memória, disco, breaker, memo e token.
-- ⚠️ **Bondbuilder**: o `apis.py` do add-in NÃO faz o fallback bondbuilder da FI (só `/deb` e `/cr`).
-  Esse fluxo existe só no projeto `negociacao-secundario`; exige `user_email` e cobre só PU→taxa.
+- **Bondbuilder** (3º fallback, `PrecoBb`/`TaxaBb`): p/ papéis fora de `/deb` e `/cr` (ex.: LCD, LF,
+  CDB, CPF). 2 passos — `getuserbonds` (cacheado 1×/processo, casa `bond_name`==ticker → `doc_id`) e
+  `/bb/bondbuildercalculator`. É **simétrico** como o `/deb`: manda `rate`→volta `m2m` (PU)+`maculayDuration`;
+  manda `pu`→volta `m2mRate`. Cobre `=PU`/`=DUR`/`=TAXA`. Exige a env var **`user_fianalytics`** (e-mail;
+  fallback `.env` = `FIANALYTICS_USER`). ⚠️ Usa `http.client` (não urllib) via `_PostFiRaw`: o WAF do
+  `/bb` exige o header `x-api-key` em **minúsculo** e o urllib title-caseia → 502. `_PostFiRaw` também
+  faz o proxy (CONNECT tunnel). Só dispara depois de B3 e FI falharem (custa 1 `getuserbonds`).
 
 ## Como ALTERAR (fluxo de trabalho)
 

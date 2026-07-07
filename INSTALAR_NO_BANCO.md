@@ -64,13 +64,14 @@ A share precisa estar acessível quando o Excel abre.
 Rode o comando de verificação acima. Se `pythonw` do PATH já for esse Python com 0.36.6, ótimo —
 o add-in o encontra sozinho. Se o PC tem **vários Python**, veja o passo 6.
 
-### 3. Setar as 4 variáveis de ambiente do usuário (segredos + proxy)
+### 3. Setar as variáveis de ambiente do usuário (segredos + proxy)
 No banco não existe arquivo `.env`; os segredos entram por variável de ambiente. Setar **no usuário**:
 
 | Variável | Conteúdo |
 |---|---|
 | `token_calc_b3` | token do B3 Calculator |
 | `token_fianalytics` | API key do FI Analytics |
+| `user_fianalytics` | e-mail do usuário FI (só p/ o fallback bondbuilder de papéis fora de deb/cri/cra; opcional) |
 | `proxy_http` | `http://USUARIO:SENHA@HOST:PORTA` |
 | `proxy_https` | `http://USUARIO:SENHA@HOST:PORTA` |
 

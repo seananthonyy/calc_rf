@@ -19,9 +19,12 @@ import os
 import re
 import json
 import time
+import base64
 import tempfile
+import http.client
 import urllib.request
 import urllib.error
+from urllib.parse import urlparse, unquote
 
 from config import ENV_PATH
 
@@ -29,6 +32,7 @@ from config import ENV_PATH
 # daqui em produção; o .env serve só como fallback de desenvolvimento local.
 ENV_TOKEN_B3 = "token_calc_b3"
 ENV_KEY_FI   = "token_fianalytics"
+ENV_USER_FI  = "user_fianalytics"   # e-mail p/ getuserbonds do bondbuilder (fallback: FIANALYTICS_USER)
 
 # Proxy — env vars com a URL completa, incluindo usuário/senha, no formato
 # http://USUARIO:SENHA@HOST:PORTA. Ausentes (dev) → conexão direta.
@@ -39,6 +43,8 @@ B3_BASE      = "https://api.calculadorarendafixa.com.br"
 FI_BASE      = "https://endpoint.fi-analytics.com.br"
 FI_DEB_PATH  = "/deb/debenturecalculator"
 FI_CR_PATH   = "/cr/cricracalculator"   # CRI/CRA (mesmos campos da resposta)
+FI_BB_PATH       = "/bb/bondbuildercalculator"             # fallback: papéis fora de /deb e /cr
+FI_BB_BONDS_PATH = "/bb/bondbuildercalculator/getuserbonds"
 TIMEOUT_SEG  = 6  # timeout curto por chamada para não travar o Excel
 
 # Circuit-breaker: se uma base (B3/FI) der timeout/erro de REDE, marca-se como
@@ -107,7 +113,9 @@ _opener = _ConstruirOpener()
 _tokenB3 = None
 _cacheRespostas: dict = {}
 _indisponivel: dict = {}  # base_url -> time.monotonic() de quando caiu (circuit-breaker)
-_fonteTicker: dict = {}   # ticker(upper) -> "b3"|"fi": qual API respondeu (memo de fonte)
+_fonteTicker: dict = {}   # ticker(upper) -> "b3"|"fi"|"bb": qual fonte respondeu (memo)
+_userBonds = None         # cache 1x/processo do getuserbonds: lista de {bond_name,_id} ou None
+_userBondsBuscado = False
 
 
 # ─── cache em disco (TTL) ────────────────────────────────────────────────────
@@ -185,12 +193,14 @@ def _Abrir(req, base):
 
 
 def LimparCache():
-    """Esvazia o cache (memória+disco), o token, o breaker e o memo de fonte."""
-    global _tokenB3
+    """Esvazia o cache (memória+disco), o token, o breaker, o memo e os bonds."""
+    global _tokenB3, _userBonds, _userBondsBuscado
     _cacheRespostas.clear()
     _indisponivel.clear()
     _fonteTicker.clear()
     _tokenB3 = None
+    _userBonds = None
+    _userBondsBuscado = False
     try:
         os.remove(_CACHE_FILE)
     except OSError:
@@ -418,51 +428,171 @@ def TaxaFi(ticker, dataIso, pu):
     return resultado
 
 
-# ─── roteamento B3 → FI com memo de fonte por ticker ─────────────────────────
-# Na 1ª vez tenta B3 e cai p/ FI; memoriza qual respondeu (só em sucesso) e, nas
-# próximas, tenta a fonte conhecida primeiro — mas SEMPRE mantém o fallback, então
-# o memo só reordena, nunca bloqueia a outra API.
+# -----------------------------------------------------------------------------
+# FI Analytics — bondbuilder (fallback p/ papéis fora de /deb e /cr)
+# -----------------------------------------------------------------------------
+# Mesmo motor da FI, mas o papel é endereçado por doc_id (de getuserbonds), não
+# por ticker. É SIMÉTRICO como o /deb: manda `rate` → volta `m2m` (PU) + duration;
+# manda `pu` → volta `m2mRate`. Exige o e-mail do usuário (ENV_USER_FI) e uma
+# chamada getuserbonds (cacheada 1x/processo). Só dispara depois de B3 e FI falharem.
+
+def _PostFiRaw(path, corpo):
+    """POST num endpoint FI via http.client (NÃO via urllib).
+
+    Motivo: o WAF do /bb exige o header 'x-api-key' em MINÚSCULO; o urllib.request
+    title-caseia todo header ('X-Api-Key') e o gateway devolve 502. O http.client
+    preserva a caixa. Suporta o proxy do banco (CONNECT tunnel c/ Proxy-Authorization).
+    Respeita o circuit-breaker de FI_BASE. Retorna dict/list (double-encoded resolvido) ou None."""
+    chave = _Cred(ENV_KEY_FI, "FIANALYTICS_API_KEY")
+    if not chave or _EmCooldown(FI_BASE):
+        return None
+    corpoBytes = json.dumps(corpo).encode()
+    headers = {"content-type": "application/json; charset=utf-8", "x-api-key": chave}
+    host = urlparse(FI_BASE).hostname
+    proxy = os.getenv(ENV_PROXY_HTTPS)
+    conn = None
+    try:
+        if proxy:
+            p = urlparse(proxy)
+            conn = http.client.HTTPSConnection(p.hostname, p.port or 8080, timeout=TIMEOUT_SEG)
+            tunel = {}
+            if p.username:
+                cred = f"{unquote(p.username)}:{unquote(p.password or '')}"
+                tunel["Proxy-Authorization"] = "Basic " + base64.b64encode(cred.encode()).decode()
+            conn.set_tunnel(host, 443, tunel)
+        else:
+            conn = http.client.HTTPSConnection(host, 443, timeout=TIMEOUT_SEG)
+        conn.request("POST", path, body=corpoBytes, headers=headers)
+        resp = conn.getresponse()
+        raw = resp.read().decode()
+        status = resp.status
+    except Exception:
+        _indisponivel[FI_BASE] = time.monotonic()   # erro de rede → derruba o breaker
+        return None
+    finally:
+        if conn is not None:
+            conn.close()
+    _indisponivel.pop(FI_BASE, None)                 # servidor respondeu → base no ar
+    if status >= 400:
+        return None
+    try:
+        externo = json.loads(raw)
+        return json.loads(externo) if isinstance(externo, str) else externo
+    except Exception:
+        return None
+
+
+def _ObterBonds():
+    """getuserbonds (cacheado 1x/processo). Lista de {bond_name,_id} ou None."""
+    global _userBonds, _userBondsBuscado
+    if _userBondsBuscado:
+        return _userBonds
+    _userBondsBuscado = True
+    email = _Cred(ENV_USER_FI, "FIANALYTICS_USER")
+    if email:
+        dados = _PostFiRaw(FI_BB_BONDS_PATH, {"user_email": email, "get_company_bonds": "1"})
+        if isinstance(dados, dict):
+            dados = dados.get("data") or dados.get("bonds")
+        if isinstance(dados, list):
+            _userBonds = dados
+    return _userBonds
+
+
+def _AcharDocId(ticker):
+    """doc_id do bond cujo bond_name == ticker (case-insensitive), ou None."""
+    bonds = _ObterBonds()
+    if not bonds:
+        return None
+    alvo = str(ticker).upper().strip()
+    for b in bonds:
+        if str(b.get("bond_name", "")).upper().strip() == alvo:
+            return b.get("_id")
+    return None
+
+
+def _BbOk(dados):
+    """Resposta do bondbuilder sem erro (statusCode 200 ou ausente)."""
+    return isinstance(dados, dict) and dados.get("statusCode") in (200, None)
+
+
+def PrecoBb(ticker, dataIso, taxa):
+    """bondbuilder modo rate → {'pu': m2m, 'duration': maculayDuration, 'pupar'} ou None."""
+    taxa = _Norm(taxa)
+    chaveCache = ("bbpu", ticker, dataIso, taxa)
+    cacheado = _CacheGet(chaveCache)
+    if cacheado is not _CACHE_AUSENTE:
+        return cacheado
+
+    resultado = None
+    docId = _AcharDocId(ticker)
+    if docId:
+        dados = _PostFiRaw(FI_BB_PATH, {"doc_id": docId, "date": dataIso, "rate": float(taxa)})
+        if _BbOk(dados):
+            pu    = dados.get("m2m")
+            dur   = dados.get("maculayDuration")
+            pupar = dados.get("currentNotionalPlusAccruedInterest")
+            if pu is not None and float(pu) > 0:
+                resultado = {
+                    "pu": float(pu),
+                    "duration": float(dur) if dur is not None else None,
+                    "pupar": float(pupar) if pupar is not None else None,
+                }
+    _CacheSet(chaveCache, resultado)
+    return resultado
+
+
+def TaxaBb(ticker, dataIso, pu):
+    """bondbuilder modo pu → yield em % a.a. (m2mRate × 100) ou None."""
+    pu = _Norm(pu)
+    chaveCache = ("bbyield", ticker, dataIso, pu)
+    cacheado = _CacheGet(chaveCache)
+    if cacheado is not _CACHE_AUSENTE:
+        return cacheado
+
+    resultado = None
+    docId = _AcharDocId(ticker)
+    if docId:
+        dados = _PostFiRaw(FI_BB_PATH, {"doc_id": docId, "date": dataIso, "pu": float(pu)})
+        if _BbOk(dados):
+            taxa = dados.get("m2mRate")
+            if taxa is not None and float(taxa) > 0:
+                resultado = float(taxa) * 100
+    _CacheSet(chaveCache, resultado)
+    return resultado
+
+
+# ─── roteamento B3 → FI → bondbuilder com memo de fonte por ticker ───────────
+# Tenta as fontes em ordem; a que respondeu (só em sucesso) é memorizada e passa
+# a ser tentada 1º nas próximas — mas o fallback é SEMPRE mantido (o memo só
+# reordena, nunca bloqueia). bondbuilder fica por último (custa 1 getuserbonds).
+
+def _OrdemFontes(tk, todas):
+    memo = _fonteTicker.get(tk)
+    return [memo] + [s for s in todas if s != memo] if memo in todas else list(todas)
+
 
 def Preco(ticker, dataIso, taxa):
-    """PU via B3→FI com memo de fonte. dict {pu,duration,pupar} ou None."""
+    """PU via B3→FI→bondbuilder com memo de fonte. dict {pu,duration,pupar} ou None."""
     tk = str(ticker).upper().strip()
-    if _fonteTicker.get(tk) == "fi":
-        r = PrecoFi(tk, dataIso, taxa)
+    fontes = {"b3": PrecoB3, "fi": PrecoFi, "bb": PrecoBb}
+    for src in _OrdemFontes(tk, ["b3", "fi", "bb"]):
+        r = fontes[src](tk, dataIso, taxa)
         if r:
+            _fonteTicker[tk] = src
             return r
-        r = PrecoB3(tk, dataIso, taxa)
-        if r:
-            _fonteTicker[tk] = "b3"
-        return r
-    r = PrecoB3(tk, dataIso, taxa)
-    if r:
-        _fonteTicker[tk] = "b3"
-        return r
-    r = PrecoFi(tk, dataIso, taxa)
-    if r:
-        _fonteTicker[tk] = "fi"
-    return r
+    return None
 
 
 def TaxaOp(ticker, dataIso, pu):
-    """Taxa (% a.a.) via B3→FI com memo de fonte. float ou None."""
+    """Taxa (% a.a.) via B3→FI→bondbuilder com memo de fonte. float ou None."""
     tk = str(ticker).upper().strip()
-    if _fonteTicker.get(tk) == "fi":
-        r = TaxaFi(tk, dataIso, pu)
+    fontes = {"b3": TaxaB3, "fi": TaxaFi, "bb": TaxaBb}
+    for src in _OrdemFontes(tk, ["b3", "fi", "bb"]):
+        r = fontes[src](tk, dataIso, pu)
         if r is not None:
+            _fonteTicker[tk] = src
             return r
-        r = TaxaB3(tk, dataIso, pu)
-        if r is not None:
-            _fonteTicker[tk] = "b3"
-        return r
-    r = TaxaB3(tk, dataIso, pu)
-    if r is not None:
-        _fonteTicker[tk] = "b3"
-        return r
-    r = TaxaFi(tk, dataIso, pu)
-    if r is not None:
-        _fonteTicker[tk] = "fi"
-    return r
+    return None
 
 
 # Carrega o cache persistido (entradas dentro do TTL) ao importar o módulo.
