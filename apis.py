@@ -18,6 +18,8 @@
 import os
 import re
 import json
+import time
+import tempfile
 import urllib.request
 import urllib.error
 
@@ -38,6 +40,18 @@ FI_BASE      = "https://endpoint.fi-analytics.com.br"
 FI_DEB_PATH  = "/deb/debenturecalculator"
 FI_CR_PATH   = "/cr/cricracalculator"   # CRI/CRA (mesmos campos da resposta)
 TIMEOUT_SEG  = 6  # timeout curto por chamada para não travar o Excel
+
+# Circuit-breaker: se uma base (B3/FI) der timeout/erro de REDE, marca-se como
+# indisponível por este período. Enquanto isso, chamadas àquela base falham na
+# hora (sem esperar o timeout) — só a 1ª célula paga a espera num "storm" de
+# recálculo; as demais caem direto no fallback. Erro HTTP (400/404) NÃO conta:
+# o servidor respondeu, então a base está no ar.
+COOLDOWN_SEG = 20
+
+# Cache em disco (persiste entre reaberturas do Excel): só resultados VÁLIDOS
+# (nunca None/erro), com validade de CACHE_TTL_SEG. Fora do TTL, refaz a chamada.
+CACHE_TTL_SEG = 600  # 10 min
+_CACHE_FILE = os.path.join(tempfile.gettempdir(), "calcrf_cache.json")
 
 _CACHE_AUSENTE = object()
 
@@ -92,13 +106,95 @@ _opener = _ConstruirOpener()
 
 _tokenB3 = None
 _cacheRespostas: dict = {}
+_indisponivel: dict = {}  # base_url -> time.monotonic() de quando caiu (circuit-breaker)
+_fonteTicker: dict = {}   # ticker(upper) -> "b3"|"fi": qual API respondeu (memo de fonte)
+
+
+# ─── cache em disco (TTL) ────────────────────────────────────────────────────
+
+def _LerArquivoCache() -> dict:
+    try:
+        with open(_CACHE_FILE, encoding="utf-8") as f:
+            dados = json.load(f)
+        return dados if isinstance(dados, dict) else {}
+    except Exception:
+        return {}
+
+
+def _CarregarCacheDisco():
+    """Carrega no cache em memória as entradas do arquivo ainda dentro do TTL."""
+    agora = time.time()
+    for entrada in _LerArquivoCache().values():
+        try:
+            if agora - entrada["t"] < CACHE_TTL_SEG:
+                _cacheRespostas[tuple(entrada["k"])] = entrada["v"]
+        except Exception:
+            pass
+
+
+def _Persistir(chave, valor):
+    """Grava (merge) uma entrada válida no arquivo, podando as já expiradas.
+    Escrita atômica (tmp + replace); qualquer falha de I/O é ignorada (cache é best-effort)."""
+    try:
+        agora = time.time()
+        dados = {k: v for k, v in _LerArquivoCache().items()
+                 if isinstance(v, dict) and agora - v.get("t", 0) < CACHE_TTL_SEG}
+        dados["|".join(map(str, chave))] = {"k": list(chave), "v": valor, "t": agora}
+        tmp = _CACHE_FILE + ".tmp"
+        with open(tmp, "w", encoding="utf-8") as f:
+            json.dump(dados, f)
+        os.replace(tmp, _CACHE_FILE)
+    except Exception:
+        pass
+
+
+def _CacheGet(chave):
+    return _cacheRespostas.get(chave, _CACHE_AUSENTE)
+
+
+def _CacheSet(chave, valor):
+    _cacheRespostas[chave] = valor
+    if valor is not None:            # só persiste resultado válido (nunca None/erro)
+        _Persistir(chave, valor)
+
+
+def _EmCooldown(base) -> bool:
+    ts = _indisponivel.get(base)
+    return ts is not None and (time.monotonic() - ts) < COOLDOWN_SEG
+
+
+def _Abrir(req, base):
+    """Abre a requisição respeitando o circuit-breaker da `base`.
+
+    - Se a base está em cooldown, levanta na hora (sem tocar a rede).
+    - Erro de REDE (timeout/conexão) → marca a base indisponível e repropaga.
+    - HTTPError (servidor respondeu, ex.: 400/404) NÃO derruba o breaker.
+    - Sucesso → limpa o breaker daquela base.
+    Retorna o objeto de resposta aberto (usar com `with`)."""
+    if _EmCooldown(base):
+        raise urllib.error.URLError(f"{base} em cooldown")
+    try:
+        resp = _opener.open(req, timeout=TIMEOUT_SEG)
+    except urllib.error.HTTPError:
+        raise  # base no ar; deixa o chamador tratar o status
+    except Exception:
+        _indisponivel[base] = time.monotonic()
+        raise
+    _indisponivel.pop(base, None)
+    return resp
 
 
 def LimparCache():
-    """Esvazia o cache de respostas e o token (força novas chamadas)."""
+    """Esvazia o cache (memória+disco), o token, o breaker e o memo de fonte."""
     global _tokenB3
     _cacheRespostas.clear()
+    _indisponivel.clear()
+    _fonteTicker.clear()
     _tokenB3 = None
+    try:
+        os.remove(_CACHE_FILE)
+    except OSError:
+        pass
 
 
 # -----------------------------------------------------------------------------
@@ -116,7 +212,7 @@ def _LoginB3():
             f"{B3_BASE}/login", data=corpo,
             headers={"Content-Type": "application/json"}, method="POST",
         )
-        with _opener.open(req, timeout=TIMEOUT_SEG) as resp:
+        with _Abrir(req, B3_BASE) as resp:
             dados = json.loads(resp.read().decode())
         return dados.get("Authorization")
     except Exception:
@@ -139,7 +235,7 @@ def _GetB3(url):
             return None
         try:
             req = urllib.request.Request(url, headers={"Authorization": token}, method="GET")
-            with _opener.open(req, timeout=TIMEOUT_SEG) as resp:
+            with _Abrir(req, B3_BASE) as resp:
                 return json.loads(resp.read().decode())
         except urllib.error.HTTPError as erro:
             if erro.code == 401 and tentativa == 0:
@@ -177,7 +273,7 @@ def PrecoB3(ticker, dataIso, taxa):
     ticker = _NormalizarTicker(ticker)
     taxa = _Norm(taxa)
     chaveCache = ("b3pu", ticker, dataIso, taxa)
-    cacheado = _cacheRespostas.get(chaveCache, _CACHE_AUSENTE)
+    cacheado = _CacheGet(chaveCache)
     if cacheado is not _CACHE_AUSENTE:
         return cacheado
 
@@ -193,7 +289,7 @@ def PrecoB3(ticker, dataIso, taxa):
                 "duration": float(dur) if dur is not None else None,
                 "pupar": float(pupar) if pupar is not None else None,
             }
-    _cacheRespostas[chaveCache] = resultado
+    _CacheSet(chaveCache, resultado)
     return resultado
 
 
@@ -202,7 +298,7 @@ def TaxaB3(ticker, dataIso, pu):
     ticker = _NormalizarTicker(ticker)
     pu = _Norm(pu)
     chaveCache = ("b3yield", ticker, dataIso, pu)
-    cacheado = _cacheRespostas.get(chaveCache, _CACHE_AUSENTE)
+    cacheado = _CacheGet(chaveCache)
     if cacheado is not _CACHE_AUSENTE:
         return cacheado
 
@@ -212,7 +308,36 @@ def TaxaB3(ticker, dataIso, pu):
         taxa = dados.get("yield")
         if taxa is not None and float(taxa) > 0:
             resultado = float(taxa)
-    _cacheRespostas[chaveCache] = resultado
+    _CacheSet(chaveCache, resultado)
+    return resultado
+
+
+def FatorDi(dataInicioIso, dataFimIso, percentual=100.0):
+    """Fator de CDI acumulado entre duas datas (endpoint público B3 /di/calculo).
+
+    Retorna o `fator` (ex.: 1.10775126 para 100% do CDI em 2024) como float, ou None.
+    - dataInicioIso/dataFimIso em 'YYYY-MM-DD';
+    - `percentual` = % do CDI (100 = 100% do CDI; 110 = 110% do CDI).
+    Endpoint SEM autenticação (não usa token B3), mas respeita o circuit-breaker de B3_BASE."""
+    percentual = _Norm(percentual)
+    chaveCache = ("b3di", dataInicioIso, dataFimIso, percentual)
+    cacheado = _CacheGet(chaveCache)
+    if cacheado is not _CACHE_AUSENTE:
+        return cacheado
+
+    resultado = None
+    try:
+        url = (f"{B3_BASE}/di/calculo?dataInicio={dataInicioIso}&dataFim={dataFimIso}"
+               f"&percentual={percentual}&valor=1")
+        req = urllib.request.Request(url, method="GET")
+        with _Abrir(req, B3_BASE) as resp:
+            dados = json.loads(resp.read().decode())
+        fator = dados.get("fator") if isinstance(dados, dict) else None
+        if fator is not None and float(fator) > 0:
+            resultado = float(fator)
+    except Exception:
+        resultado = None
+    _CacheSet(chaveCache, resultado)
     return resultado
 
 
@@ -232,7 +357,7 @@ def _PostFi(corpo, path=FI_DEB_PATH):
             headers={"Content-Type": "application/json; charset=utf-8", "x-api-key": chave},
             method="POST",
         )
-        with _opener.open(req, timeout=TIMEOUT_SEG) as resp:
+        with _Abrir(req, FI_BASE) as resp:
             externo = json.loads(resp.read().decode())
         return json.loads(externo) if isinstance(externo, str) else externo
     except Exception:
@@ -255,7 +380,7 @@ def PrecoFi(ticker, dataIso, taxa):
     """Modo rate → {'pu': m2m, 'duration': maculayDuration anos|None} ou None."""
     taxa = _Norm(taxa)
     chaveCache = ("fipu", ticker, dataIso, taxa)
-    cacheado = _cacheRespostas.get(chaveCache, _CACHE_AUSENTE)
+    cacheado = _CacheGet(chaveCache)
     if cacheado is not _CACHE_AUSENTE:
         return cacheado
 
@@ -271,7 +396,7 @@ def PrecoFi(ticker, dataIso, taxa):
                 "duration": float(dur) if dur is not None else None,
                 "pupar": float(pupar) if pupar is not None else None,
             }
-    _cacheRespostas[chaveCache] = resultado
+    _CacheSet(chaveCache, resultado)
     return resultado
 
 
@@ -279,7 +404,7 @@ def TaxaFi(ticker, dataIso, pu):
     """Modo pu → yield em % a.a. (m2mRate × 100) ou None."""
     pu = _Norm(pu)
     chaveCache = ("fiyield", ticker, dataIso, pu)
-    cacheado = _cacheRespostas.get(chaveCache, _CACHE_AUSENTE)
+    cacheado = _CacheGet(chaveCache)
     if cacheado is not _CACHE_AUSENTE:
         return cacheado
 
@@ -289,5 +414,56 @@ def TaxaFi(ticker, dataIso, pu):
         taxa = dados.get("m2mRate")
         if taxa is not None and float(taxa) > 0:
             resultado = float(taxa) * 100
-    _cacheRespostas[chaveCache] = resultado
+    _CacheSet(chaveCache, resultado)
     return resultado
+
+
+# ─── roteamento B3 → FI com memo de fonte por ticker ─────────────────────────
+# Na 1ª vez tenta B3 e cai p/ FI; memoriza qual respondeu (só em sucesso) e, nas
+# próximas, tenta a fonte conhecida primeiro — mas SEMPRE mantém o fallback, então
+# o memo só reordena, nunca bloqueia a outra API.
+
+def Preco(ticker, dataIso, taxa):
+    """PU via B3→FI com memo de fonte. dict {pu,duration,pupar} ou None."""
+    tk = str(ticker).upper().strip()
+    if _fonteTicker.get(tk) == "fi":
+        r = PrecoFi(tk, dataIso, taxa)
+        if r:
+            return r
+        r = PrecoB3(tk, dataIso, taxa)
+        if r:
+            _fonteTicker[tk] = "b3"
+        return r
+    r = PrecoB3(tk, dataIso, taxa)
+    if r:
+        _fonteTicker[tk] = "b3"
+        return r
+    r = PrecoFi(tk, dataIso, taxa)
+    if r:
+        _fonteTicker[tk] = "fi"
+    return r
+
+
+def TaxaOp(ticker, dataIso, pu):
+    """Taxa (% a.a.) via B3→FI com memo de fonte. float ou None."""
+    tk = str(ticker).upper().strip()
+    if _fonteTicker.get(tk) == "fi":
+        r = TaxaFi(tk, dataIso, pu)
+        if r is not None:
+            return r
+        r = TaxaB3(tk, dataIso, pu)
+        if r is not None:
+            _fonteTicker[tk] = "b3"
+        return r
+    r = TaxaB3(tk, dataIso, pu)
+    if r is not None:
+        _fonteTicker[tk] = "b3"
+        return r
+    r = TaxaFi(tk, dataIso, pu)
+    if r is not None:
+        _fonteTicker[tk] = "fi"
+    return r
+
+
+# Carrega o cache persistido (entradas dentro do TTL) ao importar o módulo.
+_CarregarCacheDisco()

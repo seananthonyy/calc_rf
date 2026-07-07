@@ -1,6 +1,6 @@
-# Instalar e configurar o add-in CalcRF no banco
+# Instalar e configurar o add-in AntonioOliveiraCalc no banco
 
-Guia completo, passo a passo, para deixar o add-in **CalcRF** funcionando num PC do banco.
+Guia completo, passo a passo, para deixar o add-in **AntonioOliveiraCalc** funcionando num PC do banco.
 Escrito para ser lido por uma pessoa **ou** pelo Claude Code do banco.
 
 > **Peça ao Claude do banco:** "leia o `INSTALAR_NO_BANCO.md` e me guie". Ele tem tudo aqui.
@@ -33,7 +33,7 @@ Expõe 5 funções de planilha (UDFs) para precificar renda fixa:
 
 - **Debênture, CRI/CRA, NTN-B/NTN-F**: vêm das APIs (B3 Calculator → FI Analytics).
 - **DI (tickers `DI1...`)**: não há API → calculado **localmente** em `di.py`.
-- Depois de instalado, a aba do ribbon aparece como **CalcRF**.
+- Depois de instalado, a aba do ribbon aparece como **AntonioOliveiraCalc**.
 
 ---
 
@@ -49,7 +49,7 @@ Expõe 5 funções de planilha (UDFs) para precificar renda fixa:
    Esperado: `0.36.6` e a lista mostrando `xlwings64-0.36.6.dll`. Se não, ver `DIAGNOSTICO_DLL.md`.
 3. **A pasta do add-in na share**, no caminho **`Z:\AntonioOliveira\CalcRF`** (é o `PYTHONPATH`
    embutido no `.xlam` — tem que ser esse caminho). Conteúdo mínimo:
-   `calcrf_addin.xlam`, `calcrf_addin.py`, `apis.py`, `di.py`, `config.py`, `feriados_anbima.csv`.
+   `AntonioOliveiraCalc.xlam`, `AntonioOliveiraCalc.py`, `apis.py`, `di.py`, `config.py`, `feriados_anbima.csv`.
    Atualizar puxando do repositório público do projeto.
 
 ---
@@ -83,9 +83,9 @@ Macro** → marcar **"Confiar no acesso ao modelo de objeto de projeto do VBA"**
 
 ### 5. Habilitar o add-in
 Excel → Arquivo → Opções → **Suplementos** → "Gerenciar: Suplementos do Excel" → **Ir...** →
-**Procurar** → selecionar `Z:\AntonioOliveira\CalcRF\calcrf_addin.xlam` → OK.
+**Procurar** → selecionar `Z:\AntonioOliveira\CalcRF\AntonioOliveiraCalc.xlam` → OK.
 > As UDFs já vêm **registradas** no `.xlam`. **Não** precisa "Import Functions" no banco.
-> Deve aparecer a aba **CalcRF** no ribbon.
+> Deve aparecer a aba **AntonioOliveiraCalc** no ribbon.
 
 ### 6. (Só se o PC tiver vários Python) Fixar o Python certo
 Se der erro de DLL ou as fórmulas não calcularem num PC com múltiplos Python, siga o
@@ -108,7 +108,7 @@ Feche e reabra o Excel. Numa célula:
 
 | Mudou | O que fazer | Usuário final |
 |---|---|---|
-| **Lógica** (`apis.py`, `calcrf_addin.py`, `di.py`) | colar o `.py` novo na share | reabrir o Excel |
+| **Lógica** (`apis.py`, `AntonioOliveiraCalc.py`, `di.py`) | colar o `.py` novo na share | reabrir o Excel |
 | **Nome/assinatura de UDF** ou **o `.xlam`** | trocar o `.xlam` (ver `CLAUDE.md`) | reabrir o Excel |
 
 99% das atualizações são só **colar um `.py` na share** e reabrir o Excel.
@@ -124,7 +124,7 @@ O `.xlam` fica **travado enquanto algum Excel o tiver aberto** — troque fora d
 | fórmulas não calculam, PC com vários Python | add-in pegou o Python errado | `CONFIGURAR_PYTHON.md` (passo 6) |
 | `ERRO: APIs sem resposta (B3/FI)` | faltam env vars / proxy | passo 3 |
 | `Input past end of file` | `myaddin.conf` com linha em branco sobrando | `CONFIGURAR_PYTHON.md` |
-| aba CalcRF não aparece / `#NAME?` | add-in não habilitado ou VBA não liberado | passos 4 e 5 |
+| aba AntonioOliveiraCalc não aparece / `#NAME?` | add-in não habilitado ou VBA não liberado | passos 4 e 5 |
 | Excel congela ao abrir planilha do SharePoint | resolução de URL do PYTHONPATH | (já mitigado no `.xlam`) ver `CLAUDE.md` |
 | célula piscando / recálculo em loop no SharePoint (arg vindo de XLOOKUP) | UDF assíncrona fazia write-back → loop | (já corrigido: UDFs síncronas) atualizar `.xlam`+`.py`; paliativo: cálculo Manual/F9. Ver `CLAUDE.md` |
 
@@ -136,6 +136,6 @@ O `.xlam` fica **travado enquanto algum Excel o tiver aberto** — troque fora d
 - [ ] Python 64-bit com xlwings **0.36.6** + DLL na raiz
 - [ ] `token_calc_b3`, `token_fianalytics`, `proxy_http`, `proxy_https` setados
 - [ ] "Confiar no acesso ao modelo de objeto de projeto do VBA" ligado
-- [ ] `.xlam` habilitado (aba **CalcRF** aparece)
+- [ ] `.xlam` habilitado (aba **AntonioOliveiraCalc** aparece)
 - [ ] (se multi-Python) `myaddin.conf` com a chave `Interpreter`
 - [ ] `=PU("FGEN13";"13/06/2025";6,4686%)` ≈ 961,70

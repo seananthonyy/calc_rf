@@ -22,6 +22,7 @@ Fórmulas (du = dias úteis entre a data base e o vencimento)
 """
 
 import csv
+import math
 import re
 from datetime import date, timedelta
 from pathlib import Path
@@ -67,6 +68,17 @@ def ContarDu(ini: date, fim: date, feriados=FERIADOS) -> int:
 
 # ─── DI ──────────────────────────────────────────────────────────────────────
 
+# Casas decimais de truncamento (padrão B3 para o ajuste do DI1).
+CASAS_PU   = 8
+CASAS_TAXA = 4
+
+
+def _Truncar(valor: float, casas: int) -> float:
+    """Trunca (não arredonda) `valor` em `casas` decimais. Valores sempre positivos aqui."""
+    fator = 10 ** casas
+    return math.trunc(valor * fator) / fator
+
+
 def EhTickerDi(ticker) -> bool:
     """True se o ticker é um contrato futuro de DI (ex.: DI1F27, DI1N29, DIF28)."""
     return bool(_PADRAO_DI.match(str(ticker).upper().strip()))
@@ -92,13 +104,17 @@ def _Du(dataBase: date, ticker) -> int:
 
 
 def PuDi(taxa: float, dataBase: date, ticker) -> float:
-    """PU dado a taxa (% a.a.):  PU = 100000 / (1 + taxa/100) ^ (du/252)."""
-    return 100000 / ((1 + taxa / 100) ** (_Du(dataBase, ticker) / 252))
+    """PU dado a taxa (% a.a.):  PU = 100000 / (1 + taxa/100) ^ (du/252).
+    Truncado em 8 casas decimais (padrão B3)."""
+    pu = 100000 / ((1 + taxa / 100) ** (_Du(dataBase, ticker) / 252))
+    return _Truncar(pu, CASAS_PU)
 
 
 def TaxaDi(pu: float, dataBase: date, ticker) -> float:
-    """Taxa (% a.a.) dado o PU:  Taxa = ((100000/PU) ^ (252/du) - 1) × 100."""
-    return ((100000 / pu) ** (252 / _Du(dataBase, ticker)) - 1) * 100
+    """Taxa (% a.a.) dado o PU:  Taxa = ((100000/PU) ^ (252/du) - 1) × 100.
+    Truncada em 4 casas decimais (padrão B3)."""
+    taxa = ((100000 / pu) ** (252 / _Du(dataBase, ticker)) - 1) * 100
+    return _Truncar(taxa, CASAS_TAXA)
 
 
 def DurationDi(dataBase: date, ticker) -> float:

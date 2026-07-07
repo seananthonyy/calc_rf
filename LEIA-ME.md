@@ -1,10 +1,10 @@
-# Add-in CalcRF — instalação e atualização (guia humano)
+# Add-in AntonioOliveiraCalc — instalação e atualização (guia humano)
 
 Add-in Excel de renda fixa. Preços vêm das APIs (B3 → FI Analytics) para debênture/CRI/CRA/
 NTN-B/NTN-F; **DI (`DI1...`) é calculado localmente** (não há API de DI). Empacotado como add-in
-customizado do xlwings: um único `.xlam` que disponibiliza as UDFs `=PU`, `=DUR`, `=TAXA` (+ `=TESTE`,
-`=LIMPARCACHE`) em **qualquer planilha**, sem "Import Functions" por workbook. Depois de instalado,
-aparece a aba **CalcRF** no ribbon.
+customizado do xlwings: um único `.xlam` que disponibiliza as UDFs `=PU`, `=DUR`, `=TAXA`, `=CDI`
+(+ `=TESTE`, `=LIMPARCACHE`) em **qualquer planilha**, sem "Import Functions" por workbook. Depois de instalado,
+aparece a aba **AntonioOliveiraCalc** no ribbon.
 
 > **Instalar/configurar no banco:** siga o `INSTALAR_NO_BANCO.md` (passo a passo completo).
 > Fixar o Python por PC: `CONFIGURAR_PYTHON.md`. Arquitetura/como alterar: `CLAUDE.md`.
@@ -13,8 +13,8 @@ aparece a aba **CalcRF** no ribbon.
 
 | Arquivo | O que é |
 |---|---|
-| `calcrf_addin.xlam` | o add-in (VBA do xlwings + ribbon + UDFs já registradas) |
-| `calcrf_addin.py` | as UDFs (módulo do add-in) — só API, sem cálculo local, sem banco |
+| `AntonioOliveiraCalc.xlam` | o add-in (VBA do xlwings + ribbon + UDFs já registradas) |
+| `AntonioOliveiraCalc.py` | as UDFs (módulo do add-in) — só API, sem cálculo local, sem banco |
 | `apis.py` | cliente B3/FI; lê segredos e proxy de variáveis de ambiente |
 | `config.py` | mínimo (só `ENV_PATH`, fallback de dev) |
 | `CLAUDE.md` | documentação técnica para o Claude Code |
@@ -33,7 +33,7 @@ aparece a aba **CalcRF** no ribbon.
 ## Instalação (uma vez por usuário)
 
 1. Excel → **Arquivo → Opções → Suplementos** → "Gerenciar: Suplementos do Excel" → **Ir...**
-2. **Procurar** → selecione `calcrf_addin.xlam` (na pasta da share) → OK.
+2. **Procurar** → selecione `AntonioOliveiraCalc.xlam` (na pasta da share) → OK.
 3. Teste numa célula: `=PU("FGEN13";"13/06/2025";6,4686%)` → ~961,70.
 
 > As UDFs já vêm registradas no `.xlam` (módulo `xlwings_udfs`). O passo de "Import Functions"
@@ -43,7 +43,7 @@ aparece a aba **CalcRF** no ribbon.
 
 | Mudou | O que fazer | Usuário final |
 |---|---|---|
-| **Lógica** (`apis.py`, `calcrf_addin.py`, proxy, cálculo) | colar o `.py` novo na pasta | reabrir o Excel |
+| **Lógica** (`apis.py`, `AntonioOliveiraCalc.py`, proxy, cálculo) | colar o `.py` novo na pasta | reabrir o Excel |
 | **Nome/assinatura de UDF** | reimportar no `.xlam` (ver `CLAUDE.md`) + trocar o `.xlam` | reabrir o Excel |
 
 99% das atualizações são **colar um `.py` na pasta**.

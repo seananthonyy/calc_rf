@@ -1,7 +1,7 @@
 # Diagnóstico — erro "file not found: xlwings64-0.36.6.dll"
 
 > Doc autocontido para o Claude Code do banco. Trata **um erro específico** ao usar o add-in
-> CalcRF no Excel. Para a arquitetura geral do add-in, ver `CLAUDE.md` nesta mesma pasta.
+> AntonioOliveiraCalc no Excel. Para a arquitetura geral do add-in, ver `CLAUDE.md` nesta mesma pasta.
 
 ## Sintoma
 Ao usar qualquer UDF do add-in (ex.: `=TESTE()`, `=PU(...)`), o Excel retorna:
@@ -94,7 +94,7 @@ arquitetura. Aqui o erro é `xlwings64` → Excel 64-bit → use Python 64-bit.
 1. **Feche e reabra o Excel** (ele só relê o ambiente/DLL num processo novo).
 2. Teste:
    ```
-   =TESTE()                              -> "OK — path: ...\calcrf_addin"
+   =TESTE()                              -> "OK — path: ...\AntonioOliveiraCalc"
    =PU("FGEN13";"13/06/2025";6,4686%)    -> ~961,70
    ```
 3. Se o `=TESTE()` voltar "OK" mas o `=PU` der `ERRO: APIs sem resposta (B3/FI)`, a DLL está

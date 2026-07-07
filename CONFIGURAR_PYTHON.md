@@ -1,6 +1,6 @@
-# Fixar o Python do add-in CalcRF (PCs com vários Python/xlwings)
+# Fixar o Python do add-in AntonioOliveiraCalc (PCs com vários Python/xlwings)
 
-Guia para quando o add-in **CalcRF** precisa usar um Python específico da máquina —
+Guia para quando o add-in **AntonioOliveiraCalc** precisa usar um Python específico da máquina —
 tipicamente em PCs que têm **mais de um Python instalado** e o add-in acaba pegando
 o errado.
 
