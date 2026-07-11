@@ -36,25 +36,29 @@ localmente. Datas aceitam `"dd/mm/aaaa"`, célula de data ou `HOJE()`.
 | `=cpDiPerc(ticker; data; [taxa%])` | % do DI equivalente (1.135 = 113,5%) |
 | `=cpSpreadDi(ticker; data; [taxa%])` | Spread sobre o DI |
 
-## Campos genéricos (qualquer campo das APIs)
-| Função | Retorno |
-|---|---|
-| `=cpFi(ticker; data; taxa%; "campo")` | Qualquer campo da FI (ex.: `"modifiedDuration"`, `"spreadOverNTNB"`) |
-| `=cpBond(ticker; "campo")` | Qualquer campo do getBondDetails (ex.: `"issuer"`, `"method"`, `"status"`) |
+## Indicadores — Banco Central / IBGE (todas com `[data]` opcional)
+Sem `[data]` → valor mais recente. Com `[data]` (dd/mm/aaaa) → valor **as-of**: se o dia
+exato não tem publicação (fim de semana/feriado ou série mensal), retorna o último valor
+publicado **até** a data. Ex.: `=cpSelic("31/12/2020")` → 2,0; `=cpIpca("15/03/2021")` → 0,93.
 
-## Indicadores — Banco Central (valor mais recente por padrão)
 | Função | Série |
 |---|---|
-| `=cpSelic()` | Meta SELIC (% a.a.) |
-| `=cpSelicOver()` | SELIC over anualizada (% a.a.) |
-| `=cpCdiAno()` | CDI anualizado base 252 (% a.a.) |
-| `=cpCdiDia()` | CDI do dia (% ao dia) |
-| `=cpIpca()` | IPCA do último mês (% mês) |
-| `=cpIpcaAno()` | IPCA acumulado 12 meses (%) |
-| `=cpIgpm()` / `=cpInpc()` | IGP-M / INPC do último mês (% mês) |
-| `=cpTr()` | TR — Taxa Referencial (%) |
+| `=cpSelic([data])` | Meta SELIC (% a.a.) |
+| `=cpSelicOver([data])` | SELIC over anualizada (% a.a.) |
+| `=cpCdiAno([data])` | CDI anualizado base 252 (% a.a.) |
+| `=cpCdiDia([data])` | CDI do dia (% ao dia) |
+| `=cpIpca([data])` | IPCA do mês (% mês) |
+| `=cpIpcaAno([data])` | IPCA acumulado 12 meses (%) |
+| `=cpIpca15([data])` | IPCA-15 do mês (% mês) |
+| `=cpIpcaIndice([data])` | IPCA **número-índice** (base dez/1993=100, IBGE SIDRA) |
+| `=cpIgpm([data])` / `=cpIgpDi([data])` | IGP-M / IGP-DI do mês (% mês) |
+| `=cpInpc([data])` | INPC do mês (% mês) |
+| `=cpPoupanca([data])` | Rendimento da poupança (% a.m.) |
+| `=cpTr([data])` | TR — Taxa Referencial (%) |
 | `=cpDolar([data])` / `=cpEuro([data])` | Câmbio PTAX venda (R$) |
-| `=cpBcb(serie; [dataIni]; [dataFim])` | Qualquer série do SGS por número; sem datas = último valor; com datas = spill (Data · Valor) |
+
+> **Correção IPCA entre datas** = `=cpIpcaIndice(dataFim)/cpIpcaIndice(dataIni)` — razão dos
+> números-índice; é o mesmo fator que atualiza o VNA de uma NTN-B/papel IPCA+.
 
 ## Dias úteis (feriados ANBIMA)
 | Função | Retorno |

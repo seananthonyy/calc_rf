@@ -752,11 +752,14 @@ def BcbSerie(serie, ini=None, fim=None, ultimos=None):
 
 
 def BcbValor(serie, data=None):
-    """Valor (float) de uma série SGS: na `data` (dd/MM/yyyy) ou o último disponível. None se ausente."""
+    """Valor (float) de uma série SGS na `data` (dd/MM/yyyy), com semântica as-of:
+    se o dia exato não tem publicação (fim de semana/feriado, ou série mensal
+    consultada no meio do mês), retorna o ÚLTIMO valor publicado ATÉ a data.
+    Sem `data` → último disponível. None se ausente."""
     if data:
         d = BcbSerie(serie, ini=data, fim=data)
-        if not d:  # dia sem publicação → pega o último até a data
-            d = BcbSerie(serie, ultimos=1)
+        if not d:  # dia sem publicação → último publicado até a data (as-of correto)
+            d = BcbSerie(serie, fim=data)
     else:
         d = BcbSerie(serie, ultimos=1)
     if d:
@@ -765,6 +768,37 @@ def BcbValor(serie, data=None):
         except Exception:
             return None
     return None
+
+
+# ─── IBGE SIDRA: número-índice do IPCA (correção monetária entre datas) ─────────
+SIDRA_BASE = "https://apisidra.ibge.gov.br"
+
+
+def IpcaIndice(data=None):
+    """IPCA número-índice (base dez/1993 = 100) do mês de referência de `data`
+    (dd/MM/yyyy); sem `data` = último mês publicado. Fonte: IBGE SIDRA
+    (tabela 1737, variável 2266). None se ausente.
+    A razão de dois números-índice = fator de correção do IPCA entre as datas."""
+    periodo = f"{data[6:10]}{data[3:5]}" if data else "last%201"
+    chave = ("sidra_ipca", periodo)
+    c = _CacheGet(chave)
+    if c is not _CACHE_AUSENTE:
+        return c
+    res = None
+    for p in (periodo, "last%201"):  # mês exato; se não publicado, cai no último
+        url = f"{SIDRA_BASE}/values/t/1737/n1/all/v/2266/p/{p}"
+        try:
+            req = urllib.request.Request(url, headers={"User-Agent": "Mozilla/5.0"}, method="GET")
+            with _Abrir(req, SIDRA_BASE) as resp:
+                dados = json.loads(resp.read().decode())
+            # dados[0] é o cabeçalho; linhas de dados a partir de [1]
+            if isinstance(dados, list) and len(dados) > 1:
+                res = float(str(dados[-1]["V"]).replace(",", "."))
+                break
+        except Exception:
+            res = None
+    _CacheSet(chave, res)
+    return res
 
 
 # ─── acessores genéricos de campo (para UDFs específicas e =cpFi/=cpB3/=cpBond) ─

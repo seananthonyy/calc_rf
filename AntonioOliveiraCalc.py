@@ -21,7 +21,7 @@ _IMPORT_ERROR = None
 try:
     from apis import (
         Preco, TaxaOp, LimparCache, FatorDi,
-        CampoFi, CampoBond, FluxoRestante, BcbSerie, BcbValor,
+        CampoBond, FluxoRestante, BcbValor, IpcaIndice,
     )
     import di
 except Exception as _e:
@@ -403,43 +403,6 @@ def cpSpreadDi(ticker, data, taxa=None):
 
 
 # =============================================================================
-# GENÉRICOS — qualquer campo das APIs (power user)
-# =============================================================================
-
-@xw.func
-@xw.arg('taxa', numbers=float)
-def cpFi(ticker, data, taxa, campo):
-    """Qualquer campo da resposta da FI Analytics. Ex.: =cpFi("X";hoje;6,5%;"modifiedDuration").
-    Campos úteis: taxedM2MRate, convexity, dv01, spreadOverDI, diPercentage, accruedInterest,
-    modifiedDuration, spreadOverNTNB, spreadOverPRE, nominalRate, adjustedFaceValue, isin..."""
-    if _IMPORT_ERROR:
-        return f"ERRO import: {_IMPORT_ERROR}"
-    try:
-        ticker = str(ticker).upper().strip()
-        v = CampoFi(ticker, _data_iso(data), _resolve_taxa(ticker, taxa), str(campo).strip())
-        if v is None:
-            return "#N/D"
-        return _data_saida(v) if isinstance(v, str) else v
-    except Exception as e:
-        return _erro("fi", e)
-
-
-@xw.func
-def cpBond(ticker, campo):
-    """Qualquer campo do getBondDetails da B3 (estático). Ex.: =cpBond("X";"expiredate").
-    Campos: expiredate, issuedate, startingdate, vne, yield, anniversaryday, issuer, method, status."""
-    if _IMPORT_ERROR:
-        return f"ERRO import: {_IMPORT_ERROR}"
-    try:
-        v = CampoBond(str(ticker).upper().strip(), str(campo).strip())
-        if v is None:
-            return "#N/D"
-        return _data_saida(v) if isinstance(v, str) else v
-    except Exception as e:
-        return _erro("bond", e)
-
-
-# =============================================================================
 # CDI (endpoint público B3 /di/calculo)
 # =============================================================================
 
@@ -471,108 +434,157 @@ def _data_br(data):
     return _parse_data(data).strftime("%d/%m/%Y")
 
 
+# Todas aceitam [data] opcional (dd/mm/aaaa). Semântica as-of: sem publicação no
+# dia exato (fim de semana/feriado ou série mensal), retorna o último valor ATÉ a data.
 @xw.func
-def cpSelic():
-    """Meta SELIC atual (% a.a.) — BCB série 432."""
+def cpSelic(data=None):
+    """Meta SELIC (% a.a.) — BCB série 432. [data] opcional (último por padrão)."""
     if _IMPORT_ERROR:
         return f"ERRO import: {_IMPORT_ERROR}"
     try:
-        return _bcb_valor(432)
+        return _bcb_valor(432, data)
     except Exception as e:
         return _erro("selic", e)
 
 
 @xw.func
-def cpSelicOver():
-    """SELIC over anualizada (% a.a.) — BCB série 1178."""
+def cpSelicOver(data=None):
+    """SELIC over anualizada (% a.a.) — BCB série 1178. [data] opcional."""
     if _IMPORT_ERROR:
         return f"ERRO import: {_IMPORT_ERROR}"
     try:
-        return _bcb_valor(1178)
+        return _bcb_valor(1178, data)
     except Exception as e:
         return _erro("selicover", e)
 
 
 @xw.func
-def cpCdiAno():
-    """CDI anualizado, base 252 (% a.a.) — BCB série 4389."""
+def cpCdiAno(data=None):
+    """CDI anualizado, base 252 (% a.a.) — BCB série 4389. [data] opcional."""
     if _IMPORT_ERROR:
         return f"ERRO import: {_IMPORT_ERROR}"
     try:
-        return _bcb_valor(4389)
+        return _bcb_valor(4389, data)
     except Exception as e:
         return _erro("cdiano", e)
 
 
 @xw.func
-def cpCdiDia():
-    """CDI do dia (% ao dia) — BCB série 12."""
+def cpCdiDia(data=None):
+    """CDI do dia (% ao dia) — BCB série 12. [data] opcional."""
     if _IMPORT_ERROR:
         return f"ERRO import: {_IMPORT_ERROR}"
     try:
-        return _bcb_valor(12)
+        return _bcb_valor(12, data)
     except Exception as e:
         return _erro("cdidia", e)
 
 
 @xw.func
-def cpIpca():
-    """IPCA do último mês divulgado (% no mês) — BCB série 433."""
+def cpIpca(data=None):
+    """IPCA do mês (% no mês) — BCB série 433. [data] opcional (mês de referência)."""
     if _IMPORT_ERROR:
         return f"ERRO import: {_IMPORT_ERROR}"
     try:
-        return _bcb_valor(433)
+        return _bcb_valor(433, data)
     except Exception as e:
         return _erro("ipca", e)
 
 
 @xw.func
-def cpIpcaAno():
-    """IPCA acumulado em 12 meses (%) — BCB série 13522."""
+def cpIpcaAno(data=None):
+    """IPCA acumulado em 12 meses (%) — BCB série 13522. [data] opcional."""
     if _IMPORT_ERROR:
         return f"ERRO import: {_IMPORT_ERROR}"
     try:
-        return _bcb_valor(13522)
+        return _bcb_valor(13522, data)
     except Exception as e:
         return _erro("ipcaano", e)
 
 
 @xw.func
-def cpIgpm():
-    """IGP-M do último mês (% no mês) — BCB série 189."""
+def cpIpcaIndice(data=None):
+    """IPCA número-índice (base dez/1993 = 100) do mês de referência de [data];
+    sem data = último mês. Fonte: IBGE SIDRA. A razão de dois números-índice
+    (=cpIpcaIndice(fim)/cpIpcaIndice(ini)) é o fator de correção do IPCA entre as datas."""
     if _IMPORT_ERROR:
         return f"ERRO import: {_IMPORT_ERROR}"
     try:
-        return _bcb_valor(189)
+        v = IpcaIndice(_data_br(data) if not _vazio(data) else None)
+        return float(v) if v is not None else "ERRO: SIDRA sem dado"
+    except Exception as e:
+        return _erro("ipcaindice", e)
+
+
+@xw.func
+def cpIgpm(data=None):
+    """IGP-M do mês (% no mês) — BCB série 189. [data] opcional."""
+    if _IMPORT_ERROR:
+        return f"ERRO import: {_IMPORT_ERROR}"
+    try:
+        return _bcb_valor(189, data)
     except Exception as e:
         return _erro("igpm", e)
 
 
 @xw.func
-def cpInpc():
-    """INPC do último mês (% no mês) — BCB série 188."""
+def cpIgpDi(data=None):
+    """IGP-DI do mês (% no mês) — BCB série 190. [data] opcional."""
     if _IMPORT_ERROR:
         return f"ERRO import: {_IMPORT_ERROR}"
     try:
-        return _bcb_valor(188)
+        return _bcb_valor(190, data)
+    except Exception as e:
+        return _erro("igpdi", e)
+
+
+@xw.func
+def cpInpc(data=None):
+    """INPC do mês (% no mês) — BCB série 188. [data] opcional."""
+    if _IMPORT_ERROR:
+        return f"ERRO import: {_IMPORT_ERROR}"
+    try:
+        return _bcb_valor(188, data)
     except Exception as e:
         return _erro("inpc", e)
 
 
 @xw.func
-def cpTr():
-    """TR — Taxa Referencial do último dia (%) — BCB série 226."""
+def cpIpca15(data=None):
+    """IPCA-15 do mês (% no mês) — BCB série 7478. [data] opcional."""
     if _IMPORT_ERROR:
         return f"ERRO import: {_IMPORT_ERROR}"
     try:
-        return _bcb_valor(226)
+        return _bcb_valor(7478, data)
+    except Exception as e:
+        return _erro("ipca15", e)
+
+
+@xw.func
+def cpPoupanca(data=None):
+    """Rendimento da poupança (% a.m.) — BCB série 196. [data] opcional."""
+    if _IMPORT_ERROR:
+        return f"ERRO import: {_IMPORT_ERROR}"
+    try:
+        return _bcb_valor(196, data)
+    except Exception as e:
+        return _erro("poupanca", e)
+
+
+@xw.func
+def cpTr(data=None):
+    """TR — Taxa Referencial (%) — BCB série 226. [data] opcional."""
+    if _IMPORT_ERROR:
+        return f"ERRO import: {_IMPORT_ERROR}"
+    try:
+        return _bcb_valor(226, data)
     except Exception as e:
         return _erro("tr", e)
 
 
 @xw.func
 def cpDolar(data=None):
-    """Dólar PTAX venda (R$) — BCB série 1. data opcional (último por padrão)."""
+    """Dólar PTAX venda (R$) — BCB série 1. [data] opcional (último por padrão)."""
     if _IMPORT_ERROR:
         return f"ERRO import: {_IMPORT_ERROR}"
     try:
@@ -583,46 +595,13 @@ def cpDolar(data=None):
 
 @xw.func
 def cpEuro(data=None):
-    """Euro venda (R$) — BCB série 21619. data opcional (último por padrão)."""
+    """Euro venda (R$) — BCB série 21619. [data] opcional (último por padrão)."""
     if _IMPORT_ERROR:
         return f"ERRO import: {_IMPORT_ERROR}"
     try:
         return _bcb_valor(21619, data)
     except Exception as e:
         return _erro("euro", e)
-
-
-@xw.func
-def cpBcb(serie, dataInicio=None, dataFim=None):
-    """Série do Banco Central (SGS) por número.
-    - Sem datas → valor mais recente (número).
-    - Com dataInicio (e opcional dataFim) → série no período (spill: Data | Valor)."""
-    if _IMPORT_ERROR:
-        return f"ERRO import: {_IMPORT_ERROR}"
-    try:
-        serie = int(float(serie))
-        if _vazio(dataInicio):
-            v = BcbValor(serie)
-            return float(v) if v is not None else "ERRO: BCB sem dado"
-        ini = _data_br(dataInicio)
-        fim = _data_br(dataFim) if not _vazio(dataFim) else None
-        dados = BcbSerie(serie, ini=ini, fim=fim)
-        if not dados:
-            return [["ERRO: BCB sem dado no período"]]
-        linhas = [["Data", "Valor"]]
-        for d in dados:
-            try:
-                dt = datetime.strptime(d["data"], "%d/%m/%Y").date()
-            except Exception:
-                dt = d.get("data")
-            try:
-                val = float(str(d["valor"]).replace(",", "."))
-            except Exception:
-                val = d.get("valor")
-            linhas.append([dt, val])
-        return linhas
-    except Exception as e:
-        return f"ERRO: {e}"
 
 
 # =============================================================================
