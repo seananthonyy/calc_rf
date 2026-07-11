@@ -2,6 +2,29 @@
 
 Documentação técnica para o Claude Code. Leia antes de alterar qualquer coisa nesta pasta.
 
+> ## ⭐ ATUALIZAÇÃO 11/07/2026 — prefixo `cp` + muitas funções novas
+> **TODAS as UDFs agora têm o prefixo `cp`** (`=cpPu`, `=cpTaxa`, `=cpDur`, `=cpCdi`). Adicionadas:
+> - **Dados do papel:** `cpPupar`, `cpVna`, `cpFluxo` (spill), `cpVencimento`, `cpEmissao`,
+>   `cpInicio`, `cpTaxaEmissao`, `cpVne`, `cpAniversario` (extraídos de FI + B3 getBondDetails).
+> - **Métricas FI:** `cpGrossUp`, `cpGrossUpTipo`, `cpConvexidade`, `cpDv01`, `cpDurMod`,
+>   `cpDiPerc`, `cpSpreadDi`; genéricos `cpFi(campo)` / `cpBond(campo)`.
+> - **Banco Central (SGS, público):** `cpSelic`, `cpSelicOver`, `cpCdiAno`, `cpCdiDia`, `cpIpca`,
+>   `cpIpcaAno`, `cpIgpm`, `cpInpc`, `cpTr`, `cpDolar`, `cpEuro`, `cpBcb(serie)`.
+> - **Dias úteis (feriados ANBIMA, via di.py):** `cpEhDiaUtil`, `cpDiasUteis`, `cpDiaUtilPosterior`,
+>   `cpDiaUtilAnterior`, `cpDiaUtilMaisN`.
+> - `apis.py`: `Preco` agora também devolve `vna` (cache compartilhada = performance); novos
+>   `BondDetailsB3`, `CampoFi`, `CampoBond`, `FluxoRestante`, `Detalhes`, cliente BCB `BcbSerie`/`BcbValor`.
+> - Lista completa e uso: `LEIA-ME.md`.
+>
+> **RE-BAKE (obrigatório ao renomear/adicionar UDF):** os nomes das funções ficam baked nos
+> wrappers VBA do `.xlam`. Trocar só o `.py` NÃO basta. Processo (Excel FECHADO): abrir o `.xlam`
+> via COM (`xw.App`), `wb.api.IsAddin=False`, `xlwings.udfs.import_udfs("AntonioOliveiraCalc",
+> wb.api)`, `IsAddin=True`, `save`. Excel injeta PII (`C:\Users\anton`) no `vbaProject.bin` no save
+> → scrub `anton`→`user1` (ascii **e** utf-16). Config (PYTHONPATH) fica na worksheet baked, não no
+> `.bin` → dá para transplantar só o `.bin` novo entre DEV (D:\) e PROD (Z:\). Scripts noturnos:
+> `scratchpad/rebake.py` + `scratchpad/gerar_bundle.py`; passo a passo em `PROGRESSO_NOTURNO.md`.
+> Backups do re-bake: `*.xlam.bak_noturno`.
+
 > **Mapa dos docs desta pasta:** instalar/configurar no banco → `INSTALAR_NO_BANCO.md`; fixar o
 > Python por PC → `CONFIGURAR_PYTHON.md`; erro de DLL → `DIAGNOSTICO_DLL.md`; visão geral p/ humano
 > → `LEIA-ME.md`; arquitetura/como alterar (este) → `CLAUDE.md`.

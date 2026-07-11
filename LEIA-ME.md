@@ -1,54 +1,81 @@
-# Add-in AntonioOliveiraCalc — instalação e atualização (guia humano)
+# AntonioOliveiraCalc — Add-in de Renda Fixa para Excel
 
-Add-in Excel de renda fixa. Preços vêm das APIs (B3 → FI Analytics) para debênture/CRI/CRA/
-NTN-B/NTN-F; **DI (`DI1...`) é calculado localmente** (não há API de DI). Empacotado como add-in
-customizado do xlwings: um único `.xlam` que disponibiliza as UDFs `=PU`, `=DUR`, `=TAXA`, `=CDI`
-(+ `=TESTE`, `=LIMPARCACHE`) em **qualquer planilha**, sem "Import Functions" por workbook. Depois de instalado,
-aparece a aba **AntonioOliveiraCalc** no ribbon.
+Todas as funções têm o prefixo **`cp`** (ex.: `=cpPu`). Puxam de APIs: **B3 Calculator**,
+**FI Analytics** e **Banco Central (SGS)**. Contratos de DI futuro (`DI1F27`…) são calculados
+localmente. Datas aceitam `"dd/mm/aaaa"`, célula de data ou `HOJE()`.
 
-> **Instalar/configurar no banco:** siga o `INSTALAR_NO_BANCO.md` (passo a passo completo).
-> Fixar o Python por PC: `CONFIGURAR_PYTHON.md`. Arquitetura/como alterar: `CLAUDE.md`.
-
-## Conteúdo da pasta
-
-| Arquivo | O que é |
+## Precificação
+| Função | Retorno |
 |---|---|
-| `AntonioOliveiraCalc.xlam` | o add-in (VBA do xlwings + ribbon + UDFs já registradas) |
-| `AntonioOliveiraCalc.py` | as UDFs (módulo do add-in) — só API, sem cálculo local, sem banco |
-| `apis.py` | cliente B3/FI; lê segredos e proxy de variáveis de ambiente |
-| `config.py` | mínimo (só `ENV_PATH`, fallback de dev) |
-| `CLAUDE.md` | documentação técnica para o Claude Code |
+| `=cpPu(ticker; data; taxa%)` | PU de Operação (taxa como % do Excel, ex. 6,4618%) |
+| `=cpTaxa(ticker; data; pu)` | Taxa de negociação (decimal → formate como %) |
+| `=cpDur(ticker; data; taxa%)` | Duration de Macaulay em anos |
+| `=cpCdi(dataIni; dataFim; percentual)` | Fator de CDI acumulado (percentual = número puro, 100 = 100%) |
 
-> O add-in adiciona **a própria pasta ao PYTHONPATH automaticamente** — por isso os `.py` ficam
-> junto do `.xlam`. Mantenha os arquivos sempre na mesma pasta.
+## Dados do papel (taxa é OPCIONAL em PU Par/VNA/Fluxo — usa a de emissão se omitida)
+| Função | Retorno |
+|---|---|
+| `=cpPupar(ticker; data; [taxa%])` | PU Par (valor nominal atualizado + juros) |
+| `=cpVna(ticker; data; [taxa%])` | VNA — Valor Nominal Atualizado |
+| `=cpFluxo(ticker; data; [taxa%])` | Fluxo restante (spill): Data · Tipo · Prazo(DU) · VF · VP |
+| `=cpVencimento(ticker)` | Data de vencimento |
+| `=cpEmissao(ticker)` | Data de emissão |
+| `=cpInicio(ticker)` | Data de início de rentabilidade |
+| `=cpTaxaEmissao(ticker)` | Taxa de emissão (unidade nativa: 113.5 = %DI, 6.4618 = IPCA+) |
+| `=cpVne(ticker)` | Valor Nominal de Emissão |
+| `=cpAniversario(ticker)` | Dia de aniversário |
 
-## Pré-requisitos no PC
+## Métricas / gross up (FI Analytics)
+| Função | Retorno |
+|---|---|
+| `=cpGrossUp(ticker; data; [taxa%])` | Taxa equivalente após imposto |
+| `=cpGrossUpTipo(ticker; data; [taxa%])` | `GROSS_UP` (isento) ou `AFTER_TAX` (tributado) |
+| `=cpConvexidade(ticker; data; [taxa%])` | Convexidade |
+| `=cpDv01(ticker; data; [taxa%])` | DV01 (variação do PU por 1 bp) |
+| `=cpDurMod(ticker; data; [taxa%])` | Duration modificada (anos) |
+| `=cpDiPerc(ticker; data; [taxa%])` | % do DI equivalente (1.135 = 113,5%) |
+| `=cpSpreadDi(ticker; data; [taxa%])` | Spread sobre o DI |
 
-1. **Python** acessível (instalado na máquina ou portátil na share) com o pacote **xlwings**
-   (`pip install xlwings`). Se o `pythonw.exe` estiver no PATH, o add-in já o encontra.
-2. **Variáveis de ambiente** setadas no usuário (segredos e proxy):
-   `token_calc_b3`, `token_fianalytics`, `proxy_http`, `proxy_https`.
-3. Excel: **Central de Confiabilidade → Macros → "Confiar no acesso ao modelo de objeto do VBA"**.
+## Campos genéricos (qualquer campo das APIs)
+| Função | Retorno |
+|---|---|
+| `=cpFi(ticker; data; taxa%; "campo")` | Qualquer campo da FI (ex.: `"modifiedDuration"`, `"spreadOverNTNB"`) |
+| `=cpBond(ticker; "campo")` | Qualquer campo do getBondDetails (ex.: `"issuer"`, `"method"`, `"status"`) |
 
-## Instalação (uma vez por usuário)
+## Indicadores — Banco Central (valor mais recente por padrão)
+| Função | Série |
+|---|---|
+| `=cpSelic()` | Meta SELIC (% a.a.) |
+| `=cpSelicOver()` | SELIC over anualizada (% a.a.) |
+| `=cpCdiAno()` | CDI anualizado base 252 (% a.a.) |
+| `=cpCdiDia()` | CDI do dia (% ao dia) |
+| `=cpIpca()` | IPCA do último mês (% mês) |
+| `=cpIpcaAno()` | IPCA acumulado 12 meses (%) |
+| `=cpIgpm()` / `=cpInpc()` | IGP-M / INPC do último mês (% mês) |
+| `=cpTr()` | TR — Taxa Referencial (%) |
+| `=cpDolar([data])` / `=cpEuro([data])` | Câmbio PTAX venda (R$) |
+| `=cpBcb(serie; [dataIni]; [dataFim])` | Qualquer série do SGS por número; sem datas = último valor; com datas = spill (Data · Valor) |
 
-1. Excel → **Arquivo → Opções → Suplementos** → "Gerenciar: Suplementos do Excel" → **Ir...**
-2. **Procurar** → selecione `AntonioOliveiraCalc.xlam` (na pasta da share) → OK.
-3. Teste numa célula: `=PU("FGEN13";"13/06/2025";6,4686%)` → ~961,70.
+## Dias úteis (feriados ANBIMA)
+| Função | Retorno |
+|---|---|
+| `=cpEhDiaUtil(data)` | VERDADEIRO/FALSO |
+| `=cpDiasUteis(dataIni; dataFim)` | Nº de dias úteis (início inclusive, fim exclusive) |
+| `=cpDiaUtilPosterior(data)` | Próximo dia útil após a data |
+| `=cpDiaUtilAnterior(data)` | Dia útil anterior à data |
+| `=cpDiaUtilMaisN(data; n)` | Data ± n dias úteis (n negativo anda para trás) |
 
-> As UDFs já vêm registradas no `.xlam` (módulo `xlwings_udfs`). O passo de "Import Functions"
-> **não** é necessário para o usuário final — só para quem altera as funções (ver `CLAUDE.md`).
+## Diagnóstico
+| Função | Retorno |
+|---|---|
+| `=cpTeste()` | "OK — path: …" ou o erro de import |
+| `=cpLimparCache()` | Esvazia o cache das APIs e força novas chamadas |
 
-## Atualizar (no futuro)
-
-| Mudou | O que fazer | Usuário final |
-|---|---|---|
-| **Lógica** (`apis.py`, `AntonioOliveiraCalc.py`, proxy, cálculo) | colar o `.py` novo na pasta | reabrir o Excel |
-| **Nome/assinatura de UDF** | reimportar no `.xlam` (ver `CLAUDE.md`) + trocar o `.xlam` | reabrir o Excel |
-
-99% das atualizações são **colar um `.py` na pasta**.
-
-## Cuidados
-- O `.xlam` fica **travado enquanto algum Excel o tiver aberto**. Para trocar o **próprio `.xlam`**,
-  faça fora do horário ou versione o nome. Trocar os `.py` não tem essa trava.
-- A pasta (share) precisa estar acessível quando o Excel abre.
+---
+**Observações**
+- Erros aparecem como texto `ERRO: …` na célula.
+- Performance: as funções compartilham cache — o 1º cálculo de um papel bate na rede (~1–5 s),
+  os demais vêm do cache (disco, 10 min). Rode `=cpLimparCache()` para forçar atualização.
+- Instalação/atualização/config no banco: ver `INSTALAR_NO_BANCO.md` e `CONFIGURAR_PYTHON.md`.
+  Atualizar a lógica = trocar os `.py` na share e reabrir o Excel. Trocar nomes/adicionar funções
+  exige RE-BAKE do `.xlam` (Excel fechado) — ver `CLAUDE.md`.
