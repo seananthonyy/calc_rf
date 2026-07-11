@@ -84,3 +84,15 @@ cpEhDiaUtil, cpDiasUteis, cpDiaUtilPosterior, cpDiaUtilAnterior, cpDiaUtilMaisN.
   (venc/emissão/taxaEmi/vne) compartilham `BondDetailsB3` (1 call/ticker). BCB e /di/calculo cacheados.
   → p/ um papel com N fórmulas cp*, só ~3 chamadas de rede distintas (calcPU, FI, getBondDetails),
   e só na 1ª vez (cache disco TTL 600s sobrevive a reabrir Excel). Timeout 6s + circuit-breaker.
+
+## FECHAMENTO (11/07/2026) — 42 UDFs, tudo commitado
+- Conjunto final ajustado a pedido do usuário: **removidas** cpFi, cpBond, cpBcb; **adicionadas**
+  cpIgpDi(190), cpIpca15(7478), cpPoupanca(196) e **cpIpcaIndice** (número-índice IPCA via IBGE
+  SIDRA). **Todas as 15 do BCB/IBGE ganharam `[data]` opcional com semântica AS-OF** (dia sem
+  publicação → último valor até a data; `BcbValor`/`BcbSerie(fim=data)` corrigidos no apis.py).
+- Re-bake OK a partir do template limpo (a UDF `cpB3` era o que travava o `MacroOptions`; removida).
+  42/42 bakeadas nos 2 .xlam, PII=0, config Z:/D: preservada, bundle round-trip byte-idêntico.
+- Docs (LEIA-ME, CLAUDE.md) alinhadas. Commits locais: 3e427a6 (funções+rebake), c83ce5b (docs).
+- **Uso as-of/correção IPCA:** `=cpIpcaIndice(dataFim)/cpIpcaIndice(dataIni)` = fator de correção
+  do IPCA entre datas (mesmo que atualiza VNA de NTN-B/papel IPCA+).
+- Pendente do usuário: reabrir o Excel p/ carregar o .xlam novo.
