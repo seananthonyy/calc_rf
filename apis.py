@@ -293,11 +293,13 @@ def PrecoB3(ticker, dataIso, taxa):
         pu    = dados.get("PU")
         dur   = dados.get("duration")
         pupar = dados.get("PUPar")
+        vna   = dados.get("VNA")
         if pu is not None and float(pu) > 0:
             resultado = {
                 "pu": float(pu),
                 "duration": float(dur) if dur is not None else None,
                 "pupar": float(pupar) if pupar is not None else None,
+                "vna": float(vna) if vna is not None else None,
             }
     _CacheSet(chaveCache, resultado)
     return resultado
@@ -400,11 +402,13 @@ def PrecoFi(ticker, dataIso, taxa):
         pu    = dados.get("m2m")
         dur   = dados.get("maculayDuration")
         pupar = dados.get("currentNotionalPlusAccruedInterest")
+        vna   = dados.get("adjustedFaceValue")
         if pu is not None and float(pu) > 0:
             resultado = {
                 "pu": float(pu),
                 "duration": float(dur) if dur is not None else None,
                 "pupar": float(pupar) if pupar is not None else None,
+                "vna": float(vna) if vna is not None else None,
             }
     _CacheSet(chaveCache, resultado)
     return resultado
@@ -531,11 +535,13 @@ def PrecoBb(ticker, dataIso, taxa):
             pu    = dados.get("m2m")
             dur   = dados.get("maculayDuration")
             pupar = dados.get("currentNotionalPlusAccruedInterest")
+            vna   = dados.get("adjustedFaceValue")
             if pu is not None and float(pu) > 0:
                 resultado = {
                     "pu": float(pu),
                     "duration": float(dur) if dur is not None else None,
                     "pupar": float(pupar) if pupar is not None else None,
+                    "vna": float(vna) if vna is not None else None,
                 }
     _CacheSet(chaveCache, resultado)
     return resultado
@@ -592,6 +598,207 @@ def TaxaOp(ticker, dataIso, pu):
         if r is not None:
             _fonteTicker[tk] = src
             return r
+    return None
+
+
+# =============================================================================
+# DETALHES COMPLETOS DO PAPEL — pupar, VNA, fluxo, datas, gross up, etc.
+# -----------------------------------------------------------------------------
+# A FI Analytics devolve TUDO num call (a fonte mais rica); a B3 getBondDetails
+# traz as datas/taxa de emissão em unidade nativa. As funções abaixo expõem esses
+# campos de forma normalizada (source-agnostic) para as UDFs do add-in.
+# =============================================================================
+
+def BondDetailsB3(ticker):
+    """getBondDetails da B3 (estático, sem data): dict cru ou None.
+    Campos: expiredate, issuedate, startingdate, vne, yield, anniversaryday, events..."""
+    tk = _NormalizarTicker(ticker)
+    chave = ("b3bond", tk)
+    c = _CacheGet(chave)
+    if c is not _CACHE_AUSENTE:
+        return c
+    dados = _GetB3(f"{B3_BASE}/getBondDetails/{tk}")
+    res = dados if isinstance(dados, dict) and dados.get("codbond") else None
+    _CacheSet(chave, res)
+    return res
+
+
+def _CalcPuB3Full(ticker, dataIso, taxa):
+    """Resposta COMPLETA do calcPU da B3 (com VNA, cashFlowList) ou None."""
+    tk = _NormalizarTicker(ticker)
+    taxa = _Norm(taxa)
+    chave = ("b3full", tk, dataIso, taxa)
+    c = _CacheGet(chave)
+    if c is not _CACHE_AUSENTE:
+        return c
+    dados = _GetB3(f"{B3_BASE}/calcPU/{tk}/{dataIso}/{taxa}")
+    res = dados if isinstance(dados, dict) and dados.get("PU") is not None else None
+    _CacheSet(chave, res)
+    return res
+
+
+def _FiFull(ticker, dataIso, taxa):
+    """Resposta COMPLETA da FI (modo rate), via /deb ou /cr, ou None."""
+    taxa = _Norm(taxa)
+    chave = ("fifull", str(ticker).upper().strip(), dataIso, taxa)
+    c = _CacheGet(chave)
+    if c is not _CACHE_AUSENTE:
+        return c
+    dados = _PostFiAuto({"ticker": ticker, "date": dataIso, "rate": float(taxa)})
+    res = dados if isinstance(dados, dict) and dados.get("m2m") is not None else None
+    _CacheSet(chave, res)
+    return res
+
+
+def _FluxoFi(f):
+    return [{"data": e.get("date"), "tipo": e.get("eventType"), "prazo": e.get("term"),
+             "vf": e.get("futureValue"), "vp": e.get("presentValue")}
+            for e in (f.get("cashFlowEvents") or [])]
+
+
+def _FluxoB3(full):
+    fluxo = []
+    for e in (full.get("cashFlowList") or []):
+        # a B3 usa nomes fat*Vf/fat*Vp variáveis; pega o 1º *Vf/*Vp preenchido.
+        vf = next((v for k, v in e.items() if k.lower().endswith("vf") and v is not None), None)
+        vp = next((v for k, v in e.items() if k.lower().endswith("vp") and v is not None), None)
+        fluxo.append({"data": e.get("date"), "tipo": e.get("eventType"),
+                      "prazo": e.get("term"), "vf": vf, "vp": vp})
+    return fluxo
+
+
+def Detalhes(ticker, dataIso, taxa):
+    """
+    Dict normalizado com tudo do papel (FI-first pela riqueza; B3 como fallback).
+    Chaves: fonte, pu, pupar, vna, duration, durationMod, convexidade, dv01,
+    vencimento, emissao, inicio, taxaEmissao, vne, grossup, grossupTipo,
+    diPercent, spreadDI, jurosAcum, fluxo=[{data,tipo,prazo,vf,vp}], raw.
+    Datas/taxaEmissao preferem a B3 getBondDetails (unidade nativa) quando houver.
+    """
+    tk = str(ticker).upper().strip()
+    f = _FiFull(tk, dataIso, taxa)
+    bond = BondDetailsB3(tk)
+    if f:
+        d = {
+            "fonte": "fi", "pu": f.get("m2m"),
+            "pupar": f.get("currentNotionalPlusAccruedInterest"),
+            "vna": f.get("adjustedFaceValue"), "duration": f.get("maculayDuration"),
+            "durationMod": f.get("modifiedDuration"), "convexidade": f.get("convexity"),
+            "dv01": f.get("dv01"), "vencimento": f.get("maturityDate"),
+            "emissao": f.get("issueDate"), "inicio": None, "taxaEmissao": f.get("issueRate"),
+            "vne": None, "grossup": f.get("taxedM2MRate"), "grossupTipo": f.get("taxedType"),
+            "diPercent": f.get("diPercentage"), "spreadDI": f.get("spreadOverDI"),
+            "jurosAcum": f.get("accruedInterest"), "fluxo": _FluxoFi(f), "raw": f,
+        }
+    else:
+        full = _CalcPuB3Full(tk, dataIso, taxa)
+        if not full:
+            return None
+        d = {
+            "fonte": "b3", "pu": full.get("PU"), "pupar": full.get("PUPar"),
+            "vna": full.get("VNA"), "duration": full.get("duration"),
+            "durationMod": None, "convexidade": None, "dv01": None,
+            "vencimento": None, "emissao": None, "inicio": None, "taxaEmissao": None,
+            "vne": None, "grossup": None, "grossupTipo": None, "diPercent": None,
+            "spreadDI": None, "jurosAcum": full.get("interest"),
+            "fluxo": _FluxoB3(full), "raw": full,
+        }
+    # Preferir datas/taxa/VNE da B3 getBondDetails (unidade nativa, datas limpas).
+    if bond:
+        d["vencimento"]   = bond.get("expiredate")   or d["vencimento"]
+        d["emissao"]      = bond.get("issuedate")    or d["emissao"]
+        d["inicio"]       = bond.get("startingdate") or d["inicio"]
+        d["taxaEmissao"]  = bond.get("yield")        if bond.get("yield") is not None else d["taxaEmissao"]
+        d["vne"]          = bond.get("vne")          if bond.get("vne")   is not None else d["vne"]
+        d["aniversario"]  = bond.get("anniversaryday")
+    return d
+
+
+# =============================================================================
+# BANCO CENTRAL — Sistema Gerenciador de Séries Temporais (SGS), público
+# =============================================================================
+
+BCB_BASE = "https://api.bcb.gov.br"
+
+
+def BcbSerie(serie, ini=None, fim=None, ultimos=None):
+    """Série do SGS/BCB. Lista [{'data':'dd/mm/aaaa','valor':'x'}] ou None.
+    - ultimos=N → últimos N pontos (mais eficiente para 'valor atual');
+    - senão intervalo ini..fim (strings 'dd/MM/yyyy'); sem nada → série inteira.
+    Público (sem auth); respeita proxy do banco e o circuit-breaker."""
+    chave = ("bcb", str(serie), str(ini), str(fim), str(ultimos))
+    c = _CacheGet(chave)
+    if c is not _CACHE_AUSENTE:
+        return c
+    if ultimos:
+        url = f"{BCB_BASE}/dados/serie/bcdata.sgs.{serie}/dados/ultimos/{int(ultimos)}?formato=json"
+    else:
+        url = f"{BCB_BASE}/dados/serie/bcdata.sgs.{serie}/dados?formato=json"
+        if ini:
+            url += f"&dataInicial={ini}"
+        if fim:
+            url += f"&dataFinal={fim}"
+    res = None
+    try:
+        req = urllib.request.Request(url, headers={"User-Agent": "Mozilla/5.0"}, method="GET")
+        with _Abrir(req, BCB_BASE) as resp:
+            dados = json.loads(resp.read().decode())
+        if isinstance(dados, list):
+            res = dados
+    except Exception:
+        res = None
+    _CacheSet(chave, res)
+    return res
+
+
+def BcbValor(serie, data=None):
+    """Valor (float) de uma série SGS: na `data` (dd/MM/yyyy) ou o último disponível. None se ausente."""
+    if data:
+        d = BcbSerie(serie, ini=data, fim=data)
+        if not d:  # dia sem publicação → pega o último até a data
+            d = BcbSerie(serie, ultimos=1)
+    else:
+        d = BcbSerie(serie, ultimos=1)
+    if d:
+        try:
+            return float(str(d[-1]["valor"]).replace(",", "."))
+        except Exception:
+            return None
+    return None
+
+
+# ─── acessores genéricos de campo (para UDFs específicas e =cpFi/=cpB3/=cpBond) ─
+
+def CampoFi(ticker, dataIso, taxa, campo):
+    """Um campo qualquer da resposta COMPLETA da FI (modo rate). None se ausente.
+    Ex.: 'taxedM2MRate' (gross up), 'convexity', 'dv01', 'modifiedDuration', 'spreadOverDI'."""
+    f = _FiFull(ticker, dataIso, taxa)
+    return f.get(campo) if isinstance(f, dict) else None
+
+
+def CampoB3(ticker, dataIso, taxa, campo):
+    """Um campo qualquer da resposta COMPLETA do calcPU da B3. None se ausente.
+    Ex.: 'VNA', 'PUPar', 'interest', 'issuer', 'method'."""
+    full = _CalcPuB3Full(ticker, dataIso, taxa)
+    return full.get(campo) if isinstance(full, dict) else None
+
+
+def CampoBond(ticker, campo):
+    """Um campo qualquer do getBondDetails da B3 (estático). None se ausente.
+    Ex.: 'expiredate', 'issuedate', 'startingdate', 'vne', 'yield', 'anniversaryday'."""
+    bond = BondDetailsB3(ticker)
+    return bond.get(campo) if isinstance(bond, dict) else None
+
+
+def FluxoRestante(ticker, dataIso, taxa):
+    """Fluxo de caixa remanescente na data: lista [{data,tipo,prazo,vf,vp}] ou None.
+    FI (cashFlowEvents, mais limpo) primeiro; B3 (cashFlowList) como fallback."""
+    f = _FiFull(ticker, dataIso, taxa)
+    if isinstance(f, dict) and f.get("cashFlowEvents"):
+        return _FluxoFi(f)
+    full = _CalcPuB3Full(ticker, dataIso, taxa)
+    if isinstance(full, dict) and full.get("cashFlowList"):
+        return _FluxoB3(full)
     return None
 
 
