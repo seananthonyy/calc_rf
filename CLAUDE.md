@@ -7,13 +7,16 @@ Documentação técnica para o Claude Code. Leia antes de alterar qualquer coisa
 > - **Dados do papel:** `cpPupar`, `cpVna`, `cpFluxo` (spill), `cpVencimento`, `cpEmissao`,
 >   `cpInicio`, `cpTaxaEmissao`, `cpVne`, `cpAniversario` (extraídos de FI + B3 getBondDetails).
 > - **Métricas FI:** `cpGrossUp`, `cpGrossUpTipo`, `cpConvexidade`, `cpDv01`, `cpDurMod`,
->   `cpDiPerc`, `cpSpreadDi`; genéricos `cpFi(campo)` / `cpBond(campo)`.
-> - **Banco Central (SGS, público):** `cpSelic`, `cpSelicOver`, `cpCdiAno`, `cpCdiDia`, `cpIpca`,
->   `cpIpcaAno`, `cpIgpm`, `cpInpc`, `cpTr`, `cpDolar`, `cpEuro`, `cpBcb(serie)`.
+>   `cpDiPerc`, `cpSpreadDi`.
+> - **Banco Central / IBGE (todas com `[data]` opcional, semântica as-of):** `cpSelic`,
+>   `cpSelicOver`, `cpCdiAno`, `cpCdiDia`, `cpIpca`, `cpIpcaAno`, `cpIpca15`, `cpIpcaIndice`
+>   (número-índice IBGE SIDRA), `cpIgpm`, `cpIgpDi`, `cpInpc`, `cpPoupanca`, `cpTr`,
+>   `cpDolar`, `cpEuro`. **Removidas:** `cpFi`, `cpBond`, `cpBcb`.
 > - **Dias úteis (feriados ANBIMA, via di.py):** `cpEhDiaUtil`, `cpDiasUteis`, `cpDiaUtilPosterior`,
 >   `cpDiaUtilAnterior`, `cpDiaUtilMaisN`.
 > - `apis.py`: `Preco` agora também devolve `vna` (cache compartilhada = performance); novos
->   `BondDetailsB3`, `CampoFi`, `CampoBond`, `FluxoRestante`, `Detalhes`, cliente BCB `BcbSerie`/`BcbValor`.
+>   `BondDetailsB3`, `CampoFi`, `CampoBond`, `FluxoRestante`, `Detalhes`, cliente BCB `BcbSerie`/`BcbValor`
+>   (com data as-of), e `IpcaIndice` (número-índice IPCA via IBGE SIDRA).
 > - Lista completa e uso: `LEIA-ME.md`.
 >
 > **RE-BAKE (obrigatório ao renomear/adicionar UDF):** os nomes das funções ficam baked nos
