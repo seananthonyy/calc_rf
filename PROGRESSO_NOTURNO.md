@@ -69,4 +69,18 @@ cpEhDiaUtil, cpDiasUteis, cpDiaUtilPosterior, cpDiaUtilAnterior, cpDiaUtilMaisN.
 - E1 ✓ apis.py: +vna no Preco (cache compartilhada c/ cpPu — PERF), +BondDetailsB3, _CalcPuB3Full,
   _FiFull, Detalhes, CampoFi/CampoB3/CampoBond, FluxoRestante, BcbSerie/BcbValor. Testado OK.
 - E2 ✓ AntonioOliveiraCalc.py reescrito: todas UDFs cp* + novas. Testado OK (dados, BCB, dias úteis).
-- Falta: sync apis.py→dev; E3 perf (doc); E4 re-bake .xlam (Excel fechado); E5 docs+commit.
+- sync apis.py→dev ✓ (cp PROD→dev, direção segura).
+- E4 ✓ RE-BAKE feito (Excel fechado): rebake.py via COM (import_udfs) no DEV; transplantei o
+  vbaProject.bin novo (scrubbed anton→user1 ascii+utf16) pros .xlam LIMPOS dos backups
+  (.bak_noturno), preservando config (Z:\ PROD / D:\ DEV) + docProps limpo. Verificado:
+  cpPu=9/cpSelic=8 no bin dos dois, 0 PII, zip íntegro, configs intactas. Bundle regenerado
+  (round-trip byte-idêntico, 0 segredos). Backups: *.xlam.bak_noturno.
+- Falta: E5 docs (CLAUDE.md/LEIA-ME) + commit final; E3 nota de performance; (opcional) +funções.
+
+## PERFORMANCE (E3) — decisões
+- UDFs SÍNCRONAS de propósito (async foi revertido: causava loop de write-back no SharePoint).
+- Ganho principal: `vna` no dict do `Preco` → cpPu/cpPupar/cpVna/cpDur compartilham 1 chamada
+  (mesma cache). FI-only (grossup/convexidade/dv01) compartilham a cache `_FiFull`. Estáticos
+  (venc/emissão/taxaEmi/vne) compartilham `BondDetailsB3` (1 call/ticker). BCB e /di/calculo cacheados.
+  → p/ um papel com N fórmulas cp*, só ~3 chamadas de rede distintas (calcPU, FI, getBondDetails),
+  e só na 1ª vez (cache disco TTL 600s sobrevive a reabrir Excel). Timeout 6s + circuit-breaker.
