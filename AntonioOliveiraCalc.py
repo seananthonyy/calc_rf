@@ -13,6 +13,10 @@ import xlwings as xw
 # Epoch do serial de datas do Excel (Windows): base efetiva 30/12/1899.
 _EXCEL_EPOCH = date_type(1899, 12, 30)
 
+# Versão da lógica (.py). O .xlam é versionado por NOME de arquivo (AntonioOliveiraCalc_vN.xlam);
+# a lógica aqui é retrocompatível (só adiciona UDF, nunca remove/renomeia) — ver CHANGELOG.md.
+VERSION = "1.0.0"
+
 # Todas as UDFs têm o prefixo cp (ex.: =cpPu, =cpTaxa, =cpVna...).
 # Títulos com API (debênture, CRI/CRA, NTN-B…): via B3 → FI Analytics → bondbuilder.
 # DI (tickers DI1...): sem API → calculado LOCALMENTE em di.py.
@@ -21,7 +25,7 @@ _IMPORT_ERROR = None
 try:
     from apis import (
         Preco, TaxaOp, LimparCache, FatorDi,
-        CampoBond, FluxoRestante, BcbValor, IpcaIndice,
+        CampoBond, FluxoRestante, FluxoCadastrado, BcbValor, IpcaIndice,
     )
     import di
 except Exception as _e:
@@ -95,10 +99,10 @@ def main():
 
 @xw.func
 def cpTeste():
-    """Diagnóstico: OK ou o erro de import."""
+    """Diagnóstico: versão + OK, ou o erro de import."""
     if _IMPORT_ERROR:
         return f"ERRO import: {_IMPORT_ERROR}"
-    return f"OK — path: {_THIS_DIR}"
+    return f"OK v{VERSION} — path: {_THIS_DIR}"
 
 
 @xw.func
@@ -222,6 +226,37 @@ def cpFluxo(ticker, data, taxa=None):
             linhas.append([
                 _data_saida(e.get("data")), e.get("tipo"), e.get("prazo"),
                 e.get("vf"), e.get("vp"),
+            ])
+        return linhas
+    except Exception as e:
+        return [[f"ERRO: {e}"]]
+
+
+def _ajusta_du_iso(iso):
+    """Ajusta uma data ISO 'AAAA-MM-DD' para o próximo dia útil (ANBIMA)."""
+    try:
+        d = date_type.fromisoformat(str(iso)[:10])
+        return di.ProximoDu(d).isoformat()
+    except Exception:
+        return iso
+
+
+@xw.func
+def cpFluxoCompleto(ticker):
+    """Agenda CADASTRADA completa do papel (B3 getBondDetails, spill):
+    Data | Tipo | %Amort | %Incorp. Datas ajustadas p/ dia útil (feriados ANBIMA).
+    Tipos: Amortizacao, Incorporacao (só IPCA-I), Cupom, Vencimento.
+    (=cpFluxo é o fluxo de caixa RESTANTE calculado; este é a agenda cadastrada inteira.)"""
+    if _IMPORT_ERROR:
+        return [[f"ERRO import: {_IMPORT_ERROR}"]]
+    try:
+        ag = FluxoCadastrado(str(ticker).upper().strip())
+        if not ag:
+            return [["ERRO: agenda indisponível (B3 getBondDetails)"]]
+        linhas = [["Data", "Tipo", "%Amort", "%Incorp"]]
+        for e in ag:
+            linhas.append([
+                _data_saida(_ajusta_du_iso(e["data"])), e["tipo"], e["amort"], e["incorp"],
             ])
         return linhas
     except Exception as e:

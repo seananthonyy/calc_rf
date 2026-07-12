@@ -1,5 +1,7 @@
 # CLAUDE.md — Add-in AntonioOliveiraCalc (calculadora de renda fixa via API)
 
+> **Uso e instalação: `README.md`.** Este arquivo é a referência de arquitetura/manutenção (re-bake, xlwings internals).
+
 Documentação técnica para o Claude Code. Leia antes de alterar qualquer coisa nesta pasta.
 
 > ## ⭐ ATUALIZAÇÃO 11/07/2026 — prefixo `cp` + muitas funções novas
@@ -176,7 +178,7 @@ Só o `xl/vbaProject.bin` muda.
 ## Planilha do SharePoint/OneDrive CONGELA o Excel ao usar uma UDF
 
 > ✅ **JÁ APLICADO neste `.xlam`** (30/06): o sheet `myaddin.conf` embutido tem
-> `ADD_WORKBOOK_TO_PYTHONPATH=false` e `PYTHONPATH=Z:\AntonioOliveira\CalcRF`. Funciona com o
+> `ADD_WORKBOOK_TO_PYTHONPATH=false` e `PYTHONPATH=Z:\AntonioOliveira\AntonioOliveiraCalc`. Funciona com o
 > add-in carregado **desse caminho fixo**. Se a pasta mudar, edite o valor de `PYTHONPATH` no
 > sheet `myaddin.conf` (ou via o script `scratchpad/bake_config.py`). Abaixo, a explicação/teoria.
 

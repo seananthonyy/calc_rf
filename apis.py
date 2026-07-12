@@ -623,6 +623,44 @@ def BondDetailsB3(ticker):
     return res
 
 
+def FluxoCadastrado(ticker):
+    """Agenda CADASTRADA do papel (getBondDetails.events) — lista ordenada de
+    {data(iso), tipo, amort(%), incorp(%)}, ou None se não houver cadastro na B3.
+
+    Regras (descobertas na validação de fluxos):
+      - eventType 'A' -> amortização: yield = %amortização.
+      - eventType 'J':
+          * method == 'IPCA-I' e yield>0 -> incorporação: yield = %incorporação.
+          * demais (IPCA simples, DI-PERC, DI-SPREAD, PRE) -> o yield do J é a TAXA
+            do cupom PAGO, NÃO incorporação -> marca 'Cupom' com 0/0 (não engana).
+      - eventType 'V' -> vencimento do principal.
+    Datas vêm no dia cru (ex.: dia 15) — o ajuste p/ dia útil é feito na UDF."""
+    b = BondDetailsB3(ticker)
+    if not isinstance(b, dict) or not b.get("events"):
+        return None
+    ipcaI = (b.get("method") == "IPCA-I")
+    out = []
+    for e in b["events"]:
+        d = e.get("date")
+        if not d:
+            continue
+        t = e.get("eventType")
+        y = e.get("yield") or 0.0
+        if t == "A":
+            out.append({"data": d, "tipo": "Amortizacao", "amort": y, "incorp": 0.0})
+        elif t == "J":
+            if ipcaI and y > 0:
+                out.append({"data": d, "tipo": "Incorporacao", "amort": 0.0, "incorp": y})
+            else:
+                out.append({"data": d, "tipo": "Cupom", "amort": 0.0, "incorp": 0.0})
+        elif t == "V":
+            out.append({"data": d, "tipo": "Vencimento", "amort": y, "incorp": 0.0})
+        else:
+            out.append({"data": d, "tipo": t or "?", "amort": 0.0, "incorp": 0.0})
+    out.sort(key=lambda r: r["data"])
+    return out
+
+
 def _CalcPuB3Full(ticker, dataIso, taxa):
     """Resposta COMPLETA do calcPU da B3 (com VNA, cashFlowList) ou None."""
     tk = _NormalizarTicker(ticker)
