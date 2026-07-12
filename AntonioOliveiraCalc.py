@@ -15,7 +15,7 @@ _EXCEL_EPOCH = date_type(1899, 12, 30)
 
 # Versão da lógica (.py). O .xlam é versionado por NOME de arquivo (AntonioOliveiraCalc_vN.xlam);
 # a lógica aqui é retrocompatível (só adiciona UDF, nunca remove/renomeia) — ver CHANGELOG.md.
-VERSION = "1.0.1"
+VERSION = "2.0.0"
 
 # Todas as UDFs têm o prefixo cp (ex.: =cpPu, =cpTaxa, =cpVna...).
 # Títulos com API (debênture, CRI/CRA, NTN-B…): via B3 → FI Analytics → bondbuilder.
@@ -368,20 +368,6 @@ def cpGrossUpTipo(ticker, data, taxa=None):
 
 @xw.func
 @xw.arg('taxa', numbers=float)
-def cpConvexidade(ticker, data, taxa=None):
-    """Convexidade (FI Analytics)."""
-    if _IMPORT_ERROR:
-        return f"ERRO import: {_IMPORT_ERROR}"
-    try:
-        ticker = str(ticker).upper().strip()
-        v = CampoFi(ticker, _data_iso(data), _resolve_taxa(ticker, taxa), "convexity")
-        return float(v) if v is not None else "ERRO: indisponível (FI)"
-    except Exception as e:
-        return _erro("conv", e)
-
-
-@xw.func
-@xw.arg('taxa', numbers=float)
 def cpDv01(ticker, data, taxa=None):
     """DV01 — variação do PU por 1 bp na taxa (FI Analytics)."""
     if _IMPORT_ERROR:
@@ -392,48 +378,6 @@ def cpDv01(ticker, data, taxa=None):
         return float(v) if v is not None else "ERRO: indisponível (FI)"
     except Exception as e:
         return _erro("dv01", e)
-
-
-@xw.func
-@xw.arg('taxa', numbers=float)
-def cpDurMod(ticker, data, taxa=None):
-    """Duration modificada em anos (FI Analytics)."""
-    if _IMPORT_ERROR:
-        return f"ERRO import: {_IMPORT_ERROR}"
-    try:
-        ticker = str(ticker).upper().strip()
-        v = CampoFi(ticker, _data_iso(data), _resolve_taxa(ticker, taxa), "modifiedDuration")
-        return float(v) if v is not None else "ERRO: indisponível (FI)"
-    except Exception as e:
-        return _erro("durmod", e)
-
-
-@xw.func
-@xw.arg('taxa', numbers=float)
-def cpDiPerc(ticker, data, taxa=None):
-    """Percentual do DI equivalente (FI 'diPercentage'; ex.: 1.135 = 113,5% do DI)."""
-    if _IMPORT_ERROR:
-        return f"ERRO import: {_IMPORT_ERROR}"
-    try:
-        ticker = str(ticker).upper().strip()
-        v = CampoFi(ticker, _data_iso(data), _resolve_taxa(ticker, taxa), "diPercentage")
-        return float(v) if v is not None else "ERRO: indisponível (FI)"
-    except Exception as e:
-        return _erro("diperc", e)
-
-
-@xw.func
-@xw.arg('taxa', numbers=float)
-def cpSpreadDi(ticker, data, taxa=None):
-    """Spread sobre o DI (FI 'spreadOverDI', em taxa aditiva)."""
-    if _IMPORT_ERROR:
-        return f"ERRO import: {_IMPORT_ERROR}"
-    try:
-        ticker = str(ticker).upper().strip()
-        v = CampoFi(ticker, _data_iso(data), _resolve_taxa(ticker, taxa), "spreadOverDI")
-        return float(v) if v is not None else "ERRO: indisponível (FI)"
-    except Exception as e:
-        return _erro("spreaddi", e)
 
 
 # =============================================================================
@@ -484,17 +428,6 @@ def cpSelic(data=None):
 
 
 @xw.func
-def cpSelicOver(data=None):
-    """SELIC over anualizada (% a.a.) — BCB série 1178 (data obrigatória, as-of)."""
-    if _IMPORT_ERROR:
-        return f"ERRO import: {_IMPORT_ERROR}"
-    try:
-        return _bcb_valor(1178, data)
-    except Exception as e:
-        return _erro("selicover", e)
-
-
-@xw.func
 def cpCdiAno(data=None):
     """CDI anualizado, base 252 (% a.a.) — BCB série 4389 (data obrigatória, as-of)."""
     if _IMPORT_ERROR:
@@ -506,17 +439,6 @@ def cpCdiAno(data=None):
 
 
 @xw.func
-def cpCdiDia(data=None):
-    """CDI do dia (% ao dia) — BCB série 12 (data obrigatória, as-of)."""
-    if _IMPORT_ERROR:
-        return f"ERRO import: {_IMPORT_ERROR}"
-    try:
-        return _bcb_valor(12, data)
-    except Exception as e:
-        return _erro("cdidia", e)
-
-
-@xw.func
 def cpIpca(data=None):
     """IPCA do mês (% no mês) — BCB série 433. [data] opcional (mês de referência)."""
     if _IMPORT_ERROR:
@@ -525,17 +447,6 @@ def cpIpca(data=None):
         return _bcb_valor(433, data)
     except Exception as e:
         return _erro("ipca", e)
-
-
-@xw.func
-def cpIpcaAno(data=None):
-    """IPCA acumulado em 12 meses (%) — BCB série 13522 (data obrigatória, as-of)."""
-    if _IMPORT_ERROR:
-        return f"ERRO import: {_IMPORT_ERROR}"
-    try:
-        return _bcb_valor(13522, data)
-    except Exception as e:
-        return _erro("ipcaano", e)
 
 
 @xw.func
@@ -566,28 +477,6 @@ def cpIgpm(data=None):
 
 
 @xw.func
-def cpIgpDi(data=None):
-    """IGP-DI do mês (% no mês) — BCB série 190 (data obrigatória, as-of)."""
-    if _IMPORT_ERROR:
-        return f"ERRO import: {_IMPORT_ERROR}"
-    try:
-        return _bcb_valor(190, data)
-    except Exception as e:
-        return _erro("igpdi", e)
-
-
-@xw.func
-def cpInpc(data=None):
-    """INPC do mês (% no mês) — BCB série 188 (data obrigatória, as-of)."""
-    if _IMPORT_ERROR:
-        return f"ERRO import: {_IMPORT_ERROR}"
-    try:
-        return _bcb_valor(188, data)
-    except Exception as e:
-        return _erro("inpc", e)
-
-
-@xw.func
 def cpIpca15(data=None):
     """IPCA-15 do mês (% no mês) — BCB série 7478 (data obrigatória, as-of)."""
     if _IMPORT_ERROR:
@@ -596,28 +485,6 @@ def cpIpca15(data=None):
         return _bcb_valor(7478, data)
     except Exception as e:
         return _erro("ipca15", e)
-
-
-@xw.func
-def cpPoupanca(data=None):
-    """Rendimento da poupança (% a.m.) — BCB série 196 (data obrigatória, as-of)."""
-    if _IMPORT_ERROR:
-        return f"ERRO import: {_IMPORT_ERROR}"
-    try:
-        return _bcb_valor(196, data)
-    except Exception as e:
-        return _erro("poupanca", e)
-
-
-@xw.func
-def cpTr(data=None):
-    """TR — Taxa Referencial (%) — BCB série 226 (data obrigatória, as-of)."""
-    if _IMPORT_ERROR:
-        return f"ERRO import: {_IMPORT_ERROR}"
-    try:
-        return _bcb_valor(226, data)
-    except Exception as e:
-        return _erro("tr", e)
 
 
 @xw.func

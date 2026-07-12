@@ -134,11 +134,7 @@ Feche e reabra o Excel:
 |---|---|
 | `=cpGrossUp(ticker; data; [taxa%])` | Taxa equivalente após imposto |
 | `=cpGrossUpTipo(ticker; data; [taxa%])` | `GROSS_UP` (isento) ou `AFTER_TAX` (tributado) |
-| `=cpConvexidade(ticker; data; [taxa%])` | Convexidade |
 | `=cpDv01(ticker; data; [taxa%])` | DV01 (variação do PU por 1 bp) |
-| `=cpDurMod(ticker; data; [taxa%])` | Duration modificada (anos) |
-| `=cpDiPerc(ticker; data; [taxa%])` | % do DI equivalente (1.135 = 113,5%) |
-| `=cpSpreadDi(ticker; data; [taxa%])` | Spread sobre o DI |
 
 ### Indicadores — Banco Central / IBGE (data OBRIGATÓRIA = as-of)
 **Data obrigatória** — retorna o último valor publicado **até** a data (cobre
@@ -146,12 +142,7 @@ fim de semana/feriado e séries mensais). Ex.: `=cpSelic("31/12/2020")` → 2,0.
 
 | Função | Série |
 |---|---|
-| `=cpSelic([data])` / `=cpSelicOver([data])` | Meta SELIC / SELIC over (% a.a.) |
-| `=cpCdiAno([data])` / `=cpCdiDia([data])` | CDI anualizado (base 252) / CDI do dia |
-| `=cpIpca([data])` / `=cpIpcaAno([data])` / `=cpIpca15([data])` | IPCA mês / 12m / IPCA-15 |
 | `=cpIpcaIndice([data])` | IPCA **número-índice** (base dez/1993=100, IBGE SIDRA) |
-| `=cpIgpm([data])` / `=cpIgpDi([data])` / `=cpInpc([data])` | IGP-M / IGP-DI / INPC (% mês) |
-| `=cpPoupanca([data])` / `=cpTr([data])` | Poupança (% a.m.) / TR (%) |
 | `=cpDolar([data])` / `=cpEuro([data])` | Câmbio PTAX venda (R$) |
 
 > **Correção IPCA entre datas** = `=cpIpcaIndice(dataFim)/cpIpcaIndice(dataIni)` — mesmo fator que

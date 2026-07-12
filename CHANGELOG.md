@@ -4,6 +4,14 @@ Versionamento: a **lógica** (`.py`) é retrocompatível (só adiciona UDF, nunc
 o **`.xlam` é versionado por nome de arquivo** (`AntonioOliveiraCalc_v{N}.xlam`). Versões antigas
 ficam na share e nunca são apagadas. `VERSION` no `AntonioOliveiraCalc.py` acompanha a lógica.
 
+## v2.0.0 — 2026-07-12 (remove UDFs → exige re-bake; novo `_v2.xlam`, o `_v1` permanece)
+Removidas 11 UDFs a pedido:
+- Métricas: `cpConvexidade`, `cpDurMod`, `cpDiPerc`, `cpSpreadDi`.
+- BCB/IBGE: `cpSelicOver`, `cpCdiDia`, `cpIpcaAno`, `cpIgpDi`, `cpInpc`, `cpPoupanca`, `cpTr`.
+BCB/IBGE mantidos: `cpSelic`, `cpCdiAno`, `cpIpca`, `cpIpca15`, `cpIpcaIndice`, `cpIgpm`, `cpDolar`, `cpEuro`.
+**32 UDFs.** Major bump = mudança da superfície de UDFs → novo `AntonioOliveiraCalc_v2.xlam` (o `_v1`
+fica na share e continua funcionando p/ quem já usa). Precisa re-bake (Excel fechado).
+
 ## v1.0.1 — 2026-07-12 (logic-only — sem re-bake; .xlam segue _v1)
 - **Fix:** cpGrossUp/cpGrossUpTipo/cpConvexidade/cpDv01/cpDurMod/cpDiPerc/cpSpreadDi quebravam com
   `name 'CampoFi' is not defined` — `CampoFi` agora importado do `apis.py`.
