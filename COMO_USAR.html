@@ -1,0 +1,171 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>AntonioOliveiraCalc — Guia de uso no Excel</title>
+<style>
+  :root{
+    --azul:#0b3d62; --azul2:#1769aa; --verde:#0a8f5b; --cinza:#5b6b7b;
+    --bg:#f4f7fa; --card:#ffffff; --linha:#e6edf3; --code:#eef4fb; --amarelo:#fff6da;
+  }
+  *{box-sizing:border-box}
+  body{margin:0;background:var(--bg);color:#1c2b39;
+    font-family:-apple-system,Segoe UI,Roboto,Helvetica,Arial,sans-serif;line-height:1.55}
+  .wrap{max-width:960px;margin:0 auto;padding:24px 18px 60px}
+  header{background:linear-gradient(135deg,var(--azul),var(--azul2));color:#fff;
+    border-radius:16px;padding:28px 26px;box-shadow:0 6px 24px rgba(11,61,98,.18)}
+  header h1{margin:0 0 6px;font-size:26px}
+  header p{margin:0;opacity:.92;font-size:16px}
+  .leia{background:var(--amarelo);border:1px solid #f0e0a8;border-radius:14px;
+    padding:18px 20px;margin:22px 0}
+  .leia h2{margin:0 0 10px;font-size:18px;color:#8a6d00}
+  .leia ol{margin:0;padding-left:20px}
+  .leia li{margin:6px 0}
+  code,.f{background:var(--code);color:var(--azul);border-radius:6px;padding:2px 7px;
+    font-family:Consolas,Menlo,monospace;font-size:14px;white-space:nowrap}
+  section{background:var(--card);border:1px solid var(--linha);border-radius:14px;
+    padding:6px 20px 14px;margin:18px 0;box-shadow:0 2px 10px rgba(20,60,90,.05)}
+  section h2{color:var(--azul);font-size:19px;border-bottom:2px solid var(--linha);
+    padding-bottom:8px;margin:16px 0 4px}
+  .sub{color:var(--cinza);font-size:14px;margin:2px 0 8px}
+  table{width:100%;border-collapse:collapse;margin:8px 0}
+  th,td{text-align:left;padding:9px 8px;border-bottom:1px solid var(--linha);vertical-align:top;font-size:14.5px}
+  th{color:var(--cinza);font-weight:600;font-size:12.5px;text-transform:uppercase;letter-spacing:.03em}
+  td:first-child{white-space:nowrap}
+  .res{color:var(--verde);font-weight:600}
+  .tag{display:inline-block;background:#eaf3ff;color:var(--azul2);border-radius:20px;
+    padding:2px 10px;font-size:12px;font-weight:600;margin-left:6px}
+  .tag.at{background:#fdecec;color:#b23}
+  footer{color:var(--cinza);font-size:13px;text-align:center;margin-top:26px}
+  @media print{body{background:#fff}section,header{box-shadow:none}}
+</style>
+</head>
+<body>
+<div class="wrap">
+
+  <header>
+    <h1>Funções de Renda Fixa no Excel</h1>
+    <p>Digite a fórmula numa célula, aperte <b>Enter</b>, e o número aparece. Só isso.</p>
+  </header>
+
+  <div class="leia">
+    <h2>Como usar (leia isto primeiro)</h2>
+    <ol>
+      <li>Toda fórmula começa com <code>=</code> e o nome começa com <b>cp</b>. Ex.: <code>=cpPu(...)</code></li>
+      <li><b>Datas</b> vão entre aspas, no formato dia/mês/ano: <code>"13/06/2025"</code></li>
+      <li>O <b>papel</b> (ticker) vai entre aspas: <code>"FGEN13"</code></li>
+      <li>A <b>taxa</b> você digita com o sinal de %: <code>6,4686%</code></li>
+      <li>Separe cada informação com <b>ponto e vírgula</b> <code>;</code></li>
+      <li>Alguns resultados vêm como <b>0,02</b> em vez de <b>2%</b> — é só clicar no botão <b>%</b> do Excel na célula pra mostrar como porcentagem.</li>
+    </ol>
+  </div>
+
+  <section>
+    <h2>💰 Preço e taxa de um papel</h2>
+    <p class="sub">O dia a dia: dado o papel, a data e a taxa, calcula o preço (e o contrário).</p>
+    <table>
+      <tr><th>Fórmula</th><th>O que faz</th><th>Exemplo</th></tr>
+      <tr><td class="f">cpPu</td><td>Preço (PU) do papel na data, para uma taxa</td>
+          <td><code>=cpPu("FGEN13";"13/06/2025";6,4686%)</code> → <span class="res">≈ 961,70</span></td></tr>
+      <tr><td class="f">cpTaxa</td><td>A taxa do papel, dado o preço (PU)</td>
+          <td><code>=cpTaxa("FGEN13";"13/06/2025";961,70)</code> → <span class="res">a taxa</span></td></tr>
+      <tr><td class="f">cpDur</td><td>Duration (prazo médio) em anos</td>
+          <td><code>=cpDur("FGEN13";"13/06/2025";6,4686%)</code> → <span class="res">≈ 0,9 ano</span></td></tr>
+      <tr><td class="f">cpCdi</td><td>Quanto o CDI rendeu (fator) entre duas datas</td>
+          <td><code>=cpCdi("02/01/2024";"30/12/2024";100)</code> → <span class="res">1,1077</span></td></tr>
+    </table>
+  </section>
+
+  <section>
+    <h2>📄 Dados do papel</h2>
+    <p class="sub">Só o ticker. (Em preço PU, VNA e PU Par a taxa é opcional — se não colocar, usa a de emissão.)</p>
+    <table>
+      <tr><th>Fórmula</th><th>O que faz</th><th>Exemplo</th></tr>
+      <tr><td class="f">cpVencimento</td><td>Data de vencimento</td><td><code>=cpVencimento("FGEN13")</code></td></tr>
+      <tr><td class="f">cpEmissao</td><td>Data de emissão</td><td><code>=cpEmissao("FGEN13")</code></td></tr>
+      <tr><td class="f">cpInicioRentabilidade</td><td>Data de início da rentabilidade</td><td><code>=cpInicioRentabilidade("FGEN13")</code></td></tr>
+      <tr><td class="f">cpTaxaEmissao</td><td>Taxa de emissão <span class="tag">vem 0,064686 → formate como %</span></td><td><code>=cpTaxaEmissao("FGEN13")</code></td></tr>
+      <tr><td class="f">cpVne</td><td>Valor nominal de emissão</td><td><code>=cpVne("FGEN13")</code> → <span class="res">1000</span></td></tr>
+      <tr><td class="f">cpAniversario</td><td>Dia do aniversário do papel</td><td><code>=cpAniversario("FGEN13")</code> → <span class="res">15</span></td></tr>
+      <tr><td class="f">cpVna</td><td>VNA — valor nominal atualizado na data</td><td><code>=cpVna("FGEN13";"13/06/2025")</code></td></tr>
+      <tr><td class="f">cpPupar</td><td>PU Par (valor nominal + juros acumulados)</td><td><code>=cpPupar("FGEN13";"13/06/2025")</code></td></tr>
+    </table>
+  </section>
+
+  <section>
+    <h2>📅 Fluxo e agenda do papel</h2>
+    <p class="sub">Estas fórmulas <b>derramam</b> uma tabela: clique numa célula vazia com espaço abaixo/à direita.</p>
+    <table>
+      <tr><th>Fórmula</th><th>O que faz</th><th>Exemplo</th></tr>
+      <tr><td class="f">cpFluxoCompleto</td><td>Agenda de <b>amortização e incorporação</b>: Data · %Amort · %Incorp</td>
+          <td><code>=cpFluxoCompleto("FGEN13")</code></td></tr>
+      <tr><td class="f">cpFluxo</td><td>Fluxo de caixa restante calculado (data · tipo · prazo · valor futuro · valor presente)</td>
+          <td><code>=cpFluxo("FGEN13";"13/06/2025")</code></td></tr>
+    </table>
+  </section>
+
+  <section>
+    <h2>📐 Métricas</h2>
+    <p class="sub">Gross up e DV01 <b>precisam da taxa</b> (o resultado muda conforme a taxa).</p>
+    <table>
+      <tr><th>Fórmula</th><th>O que faz</th><th>Exemplo</th></tr>
+      <tr><td class="f">cpGrossUp</td><td>Taxa equivalente considerando imposto <span class="tag at">precisa da taxa</span></td>
+          <td><code>=cpGrossUp("ISAEC2";"10/07/2026";6%)</code></td></tr>
+      <tr><td class="f">cpGrossUpTipo</td><td>Diz se o papel é isento (GROSS_UP) ou tributado (AFTER_TAX)</td>
+          <td><code>=cpGrossUpTipo("ISAEC2";"10/07/2026")</code></td></tr>
+      <tr><td class="f">cpDv01</td><td>Quanto o preço muda a cada 0,01% de taxa <span class="tag at">precisa da taxa</span></td>
+          <td><code>=cpDv01("ISAEC2";"10/07/2026";6%)</code></td></tr>
+    </table>
+  </section>
+
+  <section>
+    <h2>📈 Indicadores de mercado</h2>
+    <p class="sub">Todos precisam de uma <b>data</b>. As <b>taxas</b> vêm em decimal (0,02) — formate como % pra ver 2%.</p>
+    <table>
+      <tr><th>Fórmula</th><th>O que faz</th><th>Exemplo</th></tr>
+      <tr><td class="f">cpSelic</td><td>Taxa Selic (ao ano)</td><td><code>=cpSelic("31/12/2020")</code> → <span class="res">0,02</span> (= 2%)</td></tr>
+      <tr><td class="f">cpCdiAno</td><td>CDI ao ano</td><td><code>=cpCdiAno("31/12/2020")</code></td></tr>
+      <tr><td class="f">cpIpca</td><td>IPCA do mês</td><td><code>=cpIpca("15/03/2021")</code> → <span class="res">0,0093</span></td></tr>
+      <tr><td class="f">cpIpca15</td><td>IPCA-15 do mês</td><td><code>=cpIpca15("15/03/2021")</code></td></tr>
+      <tr><td class="f">cpIgpm</td><td>IGP-M do mês</td><td><code>=cpIgpm("31/12/2020")</code></td></tr>
+      <tr><td class="f">cpIpcaIndice</td><td>Número-índice do IPCA (não é %). Divida dois pra achar a correção entre datas</td>
+          <td><code>=cpIpcaIndice("30/06/2025")</code> → <span class="res">7312,97</span></td></tr>
+      <tr><td class="f">cpDolar</td><td>Dólar (R$)</td><td><code>=cpDolar("31/12/2020")</code> → <span class="res">5,1967</span></td></tr>
+      <tr><td class="f">cpEuro</td><td>Euro (R$)</td><td><code>=cpEuro("31/12/2020")</code></td></tr>
+    </table>
+  </section>
+
+  <section>
+    <h2>🗓️ Dias úteis (calendário ANBIMA)</h2>
+    <table>
+      <tr><th>Fórmula</th><th>O que faz</th><th>Exemplo</th></tr>
+      <tr><td class="f">cpEhDiaUtil</td><td>Diz se a data é dia útil</td><td><code>=cpEhDiaUtil("13/06/2025")</code></td></tr>
+      <tr><td class="f">cpDiasUteis</td><td>Quantos dias úteis entre duas datas</td><td><code>=cpDiasUteis("01/01/2025";"31/12/2025")</code></td></tr>
+      <tr><td class="f">cpDiaUtilPosterior</td><td>Próximo dia útil depois da data</td><td><code>=cpDiaUtilPosterior("13/06/2025")</code></td></tr>
+      <tr><td class="f">cpDiaUtilAnterior</td><td>Dia útil anterior à data</td><td><code>=cpDiaUtilAnterior("13/06/2025")</code></td></tr>
+      <tr><td class="f">cpDiaUtilMaisN</td><td>Anda N dias úteis a partir da data (N negativo volta)</td><td><code>=cpDiaUtilMaisN("13/06/2025";5)</code></td></tr>
+    </table>
+  </section>
+
+  <section>
+    <h2>🛟 Se algo não funcionar</h2>
+    <table>
+      <tr><th>Fórmula</th><th>O que faz</th><th>Exemplo</th></tr>
+      <tr><td class="f">cpTeste</td><td>Testa se está tudo certo (mostra "OK")</td><td><code>=cpTeste()</code></td></tr>
+      <tr><td class="f">cpLimparCache</td><td>Atualiza os dados / força buscar de novo</td><td><code>=cpLimparCache()</code></td></tr>
+    </table>
+    <p class="sub" style="margin-top:10px">
+      Se uma célula mostrar <b>ERRO: ...</b>, leia o texto do erro — ele diz o que faltou (ex.:
+      <i>"informe a taxa"</i> ou <i>"informe a data"</i>). Se disser que a fonte não respondeu,
+      espere alguns segundos e recalcule (tecla <b>F9</b>).
+    </p>
+  </section>
+
+  <footer>
+    AntonioOliveiraCalc • v1.0 • guia de uso
+  </footer>
+
+</div>
+</body>
+</html>

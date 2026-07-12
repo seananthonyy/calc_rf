@@ -30,6 +30,7 @@ ARQUIVOS = [
     "di.py",
     "config.py",
     "feriados_anbima.csv",
+    "COMO_USAR.html",   # guia pros traders (abre no navegador)
 ]
 
 CABECALHO = f'''"""

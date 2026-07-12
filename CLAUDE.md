@@ -24,8 +24,8 @@ Documentação técnica para o Claude Code. Leia antes de alterar qualquer coisa
 > **RE-BAKE (obrigatório ao renomear/adicionar UDF):** os nomes das funções ficam baked nos
 > wrappers VBA do `.xlam`. Trocar só o `.py` NÃO basta. Processo (Excel FECHADO): abrir o `.xlam`
 > via COM (`xw.App`), `wb.api.IsAddin=False`, `xlwings.udfs.import_udfs("AntonioOliveiraCalc",
-> wb.api)`, `IsAddin=True`, `save`. Excel injeta PII (`C:\Users\anton`) no `vbaProject.bin` no save
-> → scrub `anton`→`user1` (ascii **e** utf-16). Config (PYTHONPATH) fica na worksheet baked, não no
+> wb.api)`, `IsAddin=True`, `save`. Excel injeta PII (`C:\Users\<usuario>`) no `vbaProject.bin` no save
+> → scrub `<usuario>`→`user1` (ascii **e** utf-16). Config (PYTHONPATH) fica na worksheet baked, não no
 > `.bin` → dá para transplantar só o `.bin` novo entre DEV (D:\) e PROD (Z:\). Scripts noturnos:
 > `scratchpad/rebake.py` + `scratchpad/gerar_bundle.py`; passo a passo em `PROGRESSO_NOTURNO.md`.
 > Backups do re-bake: `*.xlam.bak_noturno`.
