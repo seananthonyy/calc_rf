@@ -15,7 +15,7 @@ _EXCEL_EPOCH = date_type(1899, 12, 30)
 
 # Versão da lógica (.py). O .xlam é versionado por NOME de arquivo (AntonioOliveiraCalc_vN.xlam);
 # a lógica aqui é retrocompatível (só adiciona UDF, nunca remove/renomeia) — ver CHANGELOG.md.
-VERSION = "2.0.0"
+VERSION = "2.0.1"
 
 # Todas as UDFs têm o prefixo cp (ex.: =cpPu, =cpTaxa, =cpVna...).
 # Títulos com API (debênture, CRI/CRA, NTN-B…): via B3 → FI Analytics → bondbuilder.
@@ -287,7 +287,7 @@ def cpEmissao(ticker):
 
 
 @xw.func
-def cpInicio(ticker):
+def cpInicioRentabilidade(ticker):
     """Data de início de rentabilidade (B3 getBondDetails)."""
     if _IMPORT_ERROR:
         return f"ERRO import: {_IMPORT_ERROR}"

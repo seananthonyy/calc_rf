@@ -120,7 +120,7 @@ Feche e reabra o Excel:
 | `=cpFluxoCompleto(ticker)` | **Agenda CADASTRADA** (spill): Data · %Amort · %Incorp (datas em dia útil) |
 | `=cpVencimento(ticker)` | Data de vencimento |
 | `=cpEmissao(ticker)` | Data de emissão |
-| `=cpInicio(ticker)` | Data de início de rentabilidade |
+| `=cpInicioRentabilidade(ticker)` | Data de início de rentabilidade |
 | `=cpTaxaEmissao(ticker)` | Taxa de emissão em **decimal** (6,4618% → 0,064618; %DI → 1,135) |
 | `=cpVne(ticker)` | Valor Nominal de Emissão |
 | `=cpAniversario(ticker)` | Dia de aniversário |

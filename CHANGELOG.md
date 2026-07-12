@@ -4,6 +4,12 @@ Versionamento: a **lógica** (`.py`) é retrocompatível (só adiciona UDF, nunc
 o **`.xlam` é versionado por nome de arquivo** (`AntonioOliveiraCalc_v{N}.xlam`). Versões antigas
 ficam na share e nunca são apagadas. `VERSION` no `AntonioOliveiraCalc.py` acompanha a lógica.
 
+## v2.0.1 — 2026-07-12
+- **Fix `cpFluxoCompleto`:** agenda **agregada por DATA** — o vencimento não duplica mais (a
+  amortização final `A` e o cupom `J` do mesmo dia viram UMA linha); linhas puras de cupom (0/0)
+  são omitidas (é uma agenda de amort/incorp). *(só `.py`, sem re-bake.)*
+- **Rename `cpInicio` → `cpInicioRentabilidade`.** *(rename de UDF → requer re-bake p/ valer no Excel.)*
+
 ## v2.0.0 — 2026-07-12 (remove UDFs → exige re-bake; novo `_v2.xlam`, o `_v1` permanece)
 Removidas 11 UDFs a pedido:
 - Métricas: `cpConvexidade`, `cpDurMod`, `cpDiPerc`, `cpSpreadDi`.

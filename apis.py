@@ -624,41 +624,38 @@ def BondDetailsB3(ticker):
 
 
 def FluxoCadastrado(ticker):
-    """Agenda CADASTRADA do papel (getBondDetails.events) — lista ordenada de
-    {data(iso), tipo, amort(%), incorp(%)}, ou None se não houver cadastro na B3.
+    """Agenda de AMORTIZAÇÃO/INCORPORAÇÃO cadastrada (getBondDetails.events), AGREGADA por data:
+    lista ordenada [{data(iso), amort(%), incorp(%)}], ou None se não houver cadastro na B3.
 
-    Regras (descobertas na validação de fluxos):
-      - eventType 'A' -> amortização: yield = %amortização.
-      - eventType 'J':
-          * method == 'IPCA-I' e yield>0 -> incorporação: yield = %incorporação.
-          * demais (IPCA simples, DI-PERC, DI-SPREAD, PRE) -> o yield do J é a TAXA
-            do cupom PAGO, NÃO incorporação -> marca 'Cupom' com 0/0 (não engana).
-      - eventType 'V' -> vencimento do principal.
+    - UMA linha por data: soma o que cai no mesmo dia (ex.: no vencimento há a amortização final
+      'A' E o cupom 'J' — vira uma linha só com o %amort).
+    - Linhas puras de cupom (sem amort nem incorp) são OMITIDAS — é uma agenda de amort/incorp.
+    Regras (validação de fluxos):
+      - 'A' e 'V' -> %amortização (yield).
+      - 'J': só quando method == 'IPCA-I' e yield>0 é incorporação (yield=%incorp). Nos demais
+        estilos (IPCA simples, DI-PERC, DI-SPREAD, PRE) o yield do 'J' é a TAXA do cupom PAGO,
+        NÃO incorporação -> não entra.
     Datas vêm no dia cru (ex.: dia 15) — o ajuste p/ dia útil é feito na UDF."""
     b = BondDetailsB3(ticker)
     if not isinstance(b, dict) or not b.get("events"):
         return None
     ipcaI = (b.get("method") == "IPCA-I")
-    out = []
+    porData = {}
     for e in b["events"]:
         d = e.get("date")
         if not d:
             continue
         t = e.get("eventType")
         y = e.get("yield") or 0.0
-        if t == "A":
-            out.append({"data": d, "tipo": "Amortizacao", "amort": y, "incorp": 0.0})
-        elif t == "J":
-            if ipcaI and y > 0:
-                out.append({"data": d, "tipo": "Incorporacao", "amort": 0.0, "incorp": y})
-            else:
-                out.append({"data": d, "tipo": "Cupom", "amort": 0.0, "incorp": 0.0})
-        elif t == "V":
-            out.append({"data": d, "tipo": "Vencimento", "amort": y, "incorp": 0.0})
-        else:
-            out.append({"data": d, "tipo": t or "?", "amort": 0.0, "incorp": 0.0})
-    out.sort(key=lambda r: r["data"])
-    return out
+        acc = porData.setdefault(d, [0.0, 0.0])   # [amort, incorp]
+        if t in ("A", "V"):
+            acc[0] += y
+        elif t == "J" and ipcaI and y > 0:
+            acc[1] += y
+        # 'J' cupom (não-IPCA-I ou yield 0) não soma nada
+    return [{"data": d, "amort": a, "incorp": i}
+            for d, (a, i) in sorted(porData.items())
+            if a > 0 or i > 0]
 
 
 def _CalcPuB3Full(ticker, dataIso, taxa):
