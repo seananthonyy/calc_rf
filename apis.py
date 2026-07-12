@@ -47,13 +47,6 @@ FI_BB_PATH       = "/bb/bondbuildercalculator"             # fallback: papéis f
 FI_BB_BONDS_PATH = "/bb/bondbuildercalculator/getuserbonds"
 TIMEOUT_SEG  = 6  # timeout curto por chamada para não travar o Excel
 
-# Circuit-breaker: se uma base (B3/FI) der timeout/erro de REDE, marca-se como
-# indisponível por este período. Enquanto isso, chamadas àquela base falham na
-# hora (sem esperar o timeout) — só a 1ª célula paga a espera num "storm" de
-# recálculo; as demais caem direto no fallback. Erro HTTP (400/404) NÃO conta:
-# o servidor respondeu, então a base está no ar.
-COOLDOWN_SEG = 20
-
 # Cache em disco (persiste entre reaberturas do Excel): só resultados VÁLIDOS
 # (nunca None/erro), com validade de CACHE_TTL_SEG. Fora do TTL, refaz a chamada.
 CACHE_TTL_SEG = 600  # 10 min
@@ -112,7 +105,6 @@ _opener = _ConstruirOpener()
 
 _tokenB3 = None
 _cacheRespostas: dict = {}
-_indisponivel: dict = {}  # base_url -> time.monotonic() de quando caiu (circuit-breaker)
 _fonteTicker: dict = {}   # ticker(upper) -> "b3"|"fi"|"bb": qual fonte respondeu (memo)
 _userBonds = None         # cache 1x/processo do getuserbonds: lista de {bond_name,_id} ou None
 _userBondsBuscado = False
@@ -166,37 +158,15 @@ def _CacheSet(chave, valor):
         _Persistir(chave, valor)
 
 
-def _EmCooldown(base) -> bool:
-    ts = _indisponivel.get(base)
-    return ts is not None and (time.monotonic() - ts) < COOLDOWN_SEG
-
-
-def _Abrir(req, base):
-    """Abre a requisição respeitando o circuit-breaker da `base`.
-
-    - Se a base está em cooldown, levanta na hora (sem tocar a rede).
-    - Erro de REDE (timeout/conexão) → marca a base indisponível e repropaga.
-    - HTTPError (servidor respondeu, ex.: 400/404) NÃO derruba o breaker.
-    - Sucesso → limpa o breaker daquela base.
-    Retorna o objeto de resposta aberto (usar com `with`)."""
-    if _EmCooldown(base):
-        raise urllib.error.URLError(f"{base} em cooldown")
-    try:
-        resp = _opener.open(req, timeout=TIMEOUT_SEG)
-    except urllib.error.HTTPError:
-        raise  # base no ar; deixa o chamador tratar o status
-    except Exception:
-        _indisponivel[base] = time.monotonic()
-        raise
-    _indisponivel.pop(base, None)
-    return resp
+def _Abrir(req, base=None):
+    """Abre a requisição (timeout padrão). `base` mantido só p/ compat. da chamada."""
+    return _opener.open(req, timeout=TIMEOUT_SEG)
 
 
 def LimparCache():
-    """Esvazia o cache (memória+disco), o token, o breaker, o memo e os bonds."""
+    """Esvazia o cache (memória+disco), o token, o memo e os bonds."""
     global _tokenB3, _userBonds, _userBondsBuscado
     _cacheRespostas.clear()
-    _indisponivel.clear()
     _fonteTicker.clear()
     _tokenB3 = None
     _userBonds = None
@@ -330,7 +300,7 @@ def FatorDi(dataInicioIso, dataFimIso, percentual=100.0):
     Retorna o `fator` (ex.: 1.10775126 para 100% do CDI em 2024) como float, ou None.
     - dataInicioIso/dataFimIso em 'YYYY-MM-DD';
     - `percentual` = % do CDI (100 = 100% do CDI; 110 = 110% do CDI).
-    Endpoint SEM autenticação (não usa token B3), mas respeita o circuit-breaker de B3_BASE."""
+    Endpoint SEM autenticação (não usa token B3), mas."""
     percentual = _Norm(percentual)
     chaveCache = ("b3di", dataInicioIso, dataFimIso, percentual)
     cacheado = _CacheGet(chaveCache)
@@ -446,9 +416,9 @@ def _PostFiRaw(path, corpo):
     Motivo: o WAF do /bb exige o header 'x-api-key' em MINÚSCULO; o urllib.request
     title-caseia todo header ('X-Api-Key') e o gateway devolve 502. O http.client
     preserva a caixa. Suporta o proxy do banco (CONNECT tunnel c/ Proxy-Authorization).
-    Respeita o circuit-breaker de FI_BASE. Retorna dict/list (double-encoded resolvido) ou None."""
+    Retorna dict/list (double-encoded resolvido) ou None."""
     chave = _Cred(ENV_KEY_FI, "FIANALYTICS_API_KEY")
-    if not chave or _EmCooldown(FI_BASE):
+    if not chave:
         return None
     corpoBytes = json.dumps(corpo).encode()
     headers = {"content-type": "application/json; charset=utf-8", "x-api-key": chave}
@@ -471,12 +441,10 @@ def _PostFiRaw(path, corpo):
         raw = resp.read().decode()
         status = resp.status
     except Exception:
-        _indisponivel[FI_BASE] = time.monotonic()   # erro de rede → derruba o breaker
         return None
     finally:
         if conn is not None:
             conn.close()
-    _indisponivel.pop(FI_BASE, None)                 # servidor respondeu → base no ar
     if status >= 400:
         return None
     try:
@@ -760,7 +728,7 @@ def BcbSerie(serie, ini=None, fim=None, ultimos=None):
     """Série do SGS/BCB. Lista [{'data':'dd/mm/aaaa','valor':'x'}] ou None.
     - ultimos=N → últimos N pontos (mais eficiente para 'valor atual');
     - senão intervalo ini..fim (strings 'dd/MM/yyyy'); sem nada → série inteira.
-    Público (sem auth); respeita proxy do banco e o circuit-breaker."""
+    Público (sem auth); respeita o proxy do banco."""
     chave = ("bcb", str(serie), str(ini), str(fim), str(ultimos))
     c = _CacheGet(chave)
     if c is not _CACHE_AUSENTE:

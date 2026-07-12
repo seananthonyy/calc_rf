@@ -1,46 +1,23 @@
 # CHANGELOG — AntonioOliveiraCalc
 
-Versionamento: a **lógica** (`.py`) é retrocompatível (só adiciona UDF, nunca remove/renomeia);
-o **`.xlam` é versionado por nome de arquivo** (`AntonioOliveiraCalc_v{N}.xlam`). Versões antigas
-ficam na share e nunca são apagadas. `VERSION` no `AntonioOliveiraCalc.py` acompanha a lógica.
-
-## v2.0.2 — 2026-07-12
-- **`cpGrossUp` e `cpDv01` agora EXIGEM a taxa** (antes usavam a de emissão por padrão). Gross up e
-  DV01 dependem da taxa negociada (ex.: ISAEC2 gross up 6%→0,0759, 12%→0,1425), então sem taxa dava
-  um número enganoso. Sem taxa → "ERRO: informe a taxa". *(só `.py`.)*
-
-## v2.0.1 — 2026-07-12
-- **Fix `cpFluxoCompleto`:** agenda **agregada por DATA** — o vencimento não duplica mais (a
-  amortização final `A` e o cupom `J` do mesmo dia viram UMA linha); linhas puras de cupom (0/0)
-  são omitidas (é uma agenda de amort/incorp). *(só `.py`, sem re-bake.)*
-- **Rename `cpInicio` → `cpInicioRentabilidade`.** *(rename de UDF → requer re-bake p/ valer no Excel.)*
-
-## v2.0.0 — 2026-07-12 (remove UDFs → exige re-bake; novo `_v2.xlam`, o `_v1` permanece)
-Removidas 11 UDFs a pedido:
-- Métricas: `cpConvexidade`, `cpDurMod`, `cpDiPerc`, `cpSpreadDi`.
-- BCB/IBGE: `cpSelicOver`, `cpCdiDia`, `cpIpcaAno`, `cpIgpDi`, `cpInpc`, `cpPoupanca`, `cpTr`.
-BCB/IBGE mantidos: `cpSelic`, `cpCdiAno`, `cpIpca`, `cpIpca15`, `cpIpcaIndice`, `cpIgpm`, `cpDolar`, `cpEuro`.
-**32 UDFs.** Major bump = mudança da superfície de UDFs → novo `AntonioOliveiraCalc_v2.xlam` (o `_v1`
-fica na share e continua funcionando p/ quem já usa). Precisa re-bake (Excel fechado).
-
-## v1.0.1 — 2026-07-12 (logic-only — sem re-bake; .xlam segue _v1)
-- **Fix:** cpGrossUp/cpGrossUpTipo/cpConvexidade/cpDv01/cpDurMod/cpDiPerc/cpSpreadDi quebravam com
-  `name 'CampoFi' is not defined` — `CampoFi` agora importado do `apis.py`.
-- `cpTaxaEmissao` passa a retornar em **decimal** (6,4618% → 0,064618; %DI 113,5% → 1,135).
-- `cpFluxoCompleto`: saída enxugada para **Data · %Amort · %Incorp** (removida a coluna Tipo).
-- Funções BCB/IBGE agora **exigem data** (as-of); sem data → "ERRO: informe a data".
+Versionamento: a **lógica** (`.py`) é retrocompatível; o **`.xlam` é versionado por nome de arquivo**
+(`AntonioOliveiraCalc_vN.xlam`) — versões antigas ficam na share e não quebram quem já usa.
+`VERSION` no `AntonioOliveiraCalc.py` acompanha a lógica.
 
 ## v1.0.0 — 2026-07-12
-- **Nova UDF `=cpFluxoCompleto(ticker)`**: agenda cadastrada inteira do papel (B3 `getBondDetails`),
-  spill `Data · Tipo · %Amort · %Incorp`, datas ajustadas por dia útil (ANBIMA). Distingue
-  Amortização, Incorporação (só em papéis `method=IPCA-I`) e Cupom (o `yield` do `J` em não-IPCA-I
-  é a taxa do cupom pago, não incorporação — não é exibido como incorp).
-- `=cpTeste()` agora mostra a versão (`OK v1.0.0 — path: …`).
-- Bundle (`AntonioOliveiraCalc_bundle.py`) regenerado via `gerar_bundle.py`; embute o `.xlam`
-  versionado `_v1`.
-- Consolidação de documentação em `README.md` (uso/instalação) + `CLAUDE.md` (arquitetura/dev).
-- Correção: o `PYTHONPATH` baked real é `Z:\AntonioOliveira\AntonioOliveiraCalc` (docs antigos diziam
-  `...\CalcRF`, o que causaria falha de install).
+Add-in `cp*` API-only (B3 → FI → bondbuilder; DI local; BCB/SGS; IBGE SIDRA). **32 UDFs.**
 
-## histórico anterior (pré-versionamento)
-Add-in `cp*` API-only (B3 → FI → BCB/IBGE; DI local). 43 UDFs. Ver `git log` para detalhes.
+- **Precificação:** `cpPu`, `cpTaxa`, `cpDur`, `cpCdi` (fator CDI acumulado, API B3).
+- **Papel:** `cpPupar`, `cpVna`, `cpFluxo` (fluxo de caixa **restante calculado**, FI→B3),
+  `cpFluxoCompleto` (**agenda cadastrada** `Data·%Amort·%Incorp`, B3 `getBondDetails`, agregada por
+  data — vencimento não duplica; linhas puras de cupom omitidas), `cpVencimento`, `cpEmissao`,
+  `cpInicioRentabilidade`, `cpTaxaEmissao` (em **decimal**), `cpVne`, `cpAniversario`.
+- **Métricas FI:** `cpGrossUp`, `cpGrossUpTipo`, `cpDv01`. `cpGrossUp` e `cpDv01` **exigem a taxa**
+  (dependem da taxa negociada).
+- **Indicadores BCB/IBGE (exigem data):** `cpSelic`, `cpCdiAno`, `cpIpca`, `cpIpca15`, `cpIpcaIndice`,
+  `cpIgpm`, `cpDolar`, `cpEuro`.
+- **Dias úteis (feriados ANBIMA):** `cpEhDiaUtil`, `cpDiasUteis`, `cpDiaUtilPosterior`,
+  `cpDiaUtilAnterior`, `cpDiaUtilMaisN`.
+- **Diagnóstico:** `cpTeste` (mostra a versão), `cpLimparCache`.
+- `apis.py` **sem circuit-breaker** (removido) — cada chamada tenta a rede direto (com cache + timeout).
+- `PYTHONPATH` baked no `.xlam`: `Z:\AntonioOliveira\AntonioOliveiraCalc`.
