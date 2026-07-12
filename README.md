@@ -140,7 +140,7 @@ Feche e reabra o Excel:
 **Data obrigatória** — retorna o último valor publicado **até** a data (cobre
 fim de semana/feriado e séries mensais). Ex.: `=cpSelic("31/12/2020")` → 2,0.
 
-| Função | Série |
+| Função | Retorno |
 |---|---|
 | `=cpIpcaIndice([data])` | IPCA **número-índice** (base dez/1993=100, IBGE SIDRA) |
 | `=cpDolar([data])` / `=cpEuro([data])` | Câmbio PTAX venda (R$) |

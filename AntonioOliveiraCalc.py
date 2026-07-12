@@ -415,6 +415,12 @@ def _bcb_valor(serie, data=None):
     return float(v) if v is not None else "ERRO: BCB sem dado"
 
 
+def _bcb_taxa(serie, data=None):
+    """Como _bcb_valor, mas devolve a TAXA em decimal (6% -> 0.06). Erros passam adiante."""
+    v = _bcb_valor(serie, data)
+    return v / 100 if isinstance(v, (int, float)) else v
+
+
 def _data_br(data):
     return _parse_data(data).strftime("%d/%m/%Y")
 
@@ -423,33 +429,33 @@ def _data_br(data):
 # dia exato (fim de semana/feriado ou série mensal), retorna o último valor ATÉ a data.
 @xw.func
 def cpSelic(data=None):
-    """Meta SELIC (% a.a.) — BCB série 432. data OBRIGATÓRIA (as-of: último valor até a data)."""
+    """Meta SELIC (DECIMAL, ex.: 0,02 = 2% a.a.) — BCB série 432. data OBRIGATÓRIA (as-of: último valor até a data)."""
     if _IMPORT_ERROR:
         return f"ERRO import: {_IMPORT_ERROR}"
     try:
-        return _bcb_valor(432, data)
+        return _bcb_taxa(432, data)
     except Exception as e:
         return _erro("selic", e)
 
 
 @xw.func
 def cpCdiAno(data=None):
-    """CDI anualizado, base 252 (% a.a.) — BCB série 4389 (data obrigatória, as-of)."""
+    """CDI anualizado base 252 (DECIMAL) — BCB série 4389 (data obrigatória, as-of)."""
     if _IMPORT_ERROR:
         return f"ERRO import: {_IMPORT_ERROR}"
     try:
-        return _bcb_valor(4389, data)
+        return _bcb_taxa(4389, data)
     except Exception as e:
         return _erro("cdiano", e)
 
 
 @xw.func
 def cpIpca(data=None):
-    """IPCA do mês (% no mês) — BCB série 433. [data] opcional (mês de referência)."""
+    """IPCA do mês (DECIMAL, ex.: 0,0093 = 0,93%) — BCB série 433. [data] opcional (mês de referência)."""
     if _IMPORT_ERROR:
         return f"ERRO import: {_IMPORT_ERROR}"
     try:
-        return _bcb_valor(433, data)
+        return _bcb_taxa(433, data)
     except Exception as e:
         return _erro("ipca", e)
 
@@ -472,22 +478,22 @@ def cpIpcaIndice(data=None):
 
 @xw.func
 def cpIgpm(data=None):
-    """IGP-M do mês (% no mês) — BCB série 189 (data obrigatória, as-of)."""
+    """IGP-M do mês (DECIMAL) — BCB série 189 (data obrigatória, as-of)."""
     if _IMPORT_ERROR:
         return f"ERRO import: {_IMPORT_ERROR}"
     try:
-        return _bcb_valor(189, data)
+        return _bcb_taxa(189, data)
     except Exception as e:
         return _erro("igpm", e)
 
 
 @xw.func
 def cpIpca15(data=None):
-    """IPCA-15 do mês (% no mês) — BCB série 7478 (data obrigatória, as-of)."""
+    """IPCA-15 do mês (DECIMAL) — BCB série 7478 (data obrigatória, as-of)."""
     if _IMPORT_ERROR:
         return f"ERRO import: {_IMPORT_ERROR}"
     try:
-        return _bcb_valor(7478, data)
+        return _bcb_taxa(7478, data)
     except Exception as e:
         return _erro("ipca15", e)
 

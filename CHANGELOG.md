@@ -14,8 +14,9 @@ Add-in `cp*` API-only (B3 → FI → bondbuilder; DI local; BCB/SGS; IBGE SIDRA)
   `cpInicioRentabilidade`, `cpTaxaEmissao` (em **decimal**), `cpVne`, `cpAniversario`.
 - **Métricas FI:** `cpGrossUp`, `cpGrossUpTipo`, `cpDv01`. `cpGrossUp` e `cpDv01` **exigem a taxa**
   (dependem da taxa negociada).
-- **Indicadores BCB/IBGE (exigem data):** `cpSelic`, `cpCdiAno`, `cpIpca`, `cpIpca15`, `cpIpcaIndice`,
-  `cpIgpm`, `cpDolar`, `cpEuro`.
+- **Indicadores BCB/IBGE (exigem data):** taxas em **decimal** (6% → 0,06) — `cpSelic`, `cpCdiAno`,
+  `cpIpca`, `cpIpca15`, `cpIgpm`. Número-índice/câmbio ficam em valor natural — `cpIpcaIndice`,
+  `cpDolar`, `cpEuro`.
 - **Dias úteis (feriados ANBIMA):** `cpEhDiaUtil`, `cpDiasUteis`, `cpDiaUtilPosterior`,
   `cpDiaUtilAnterior`, `cpDiaUtilMaisN`.
 - **Diagnóstico:** `cpTeste` (mostra a versão), `cpLimparCache`.
