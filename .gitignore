@@ -15,3 +15,6 @@ __pycache__/
 # Artefato temporário do processo de higienização do .xlam
 *.clean.xlam
 AntonioOliveiraCalc_DEV.xlam
+
+# Pacote self-contained gerado por gerar_bundle.py (derivado — gerar sob demanda p/ entregar)
+AntonioOliveiraCalc_bundle.py

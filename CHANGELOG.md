@@ -22,3 +22,8 @@ Add-in `cp*` API-only (B3 → FI → bondbuilder; DI local; BCB/SGS; IBGE SIDRA)
 - **Diagnóstico:** `cpTeste` (mostra a versão), `cpLimparCache`.
 - `apis.py` **sem circuit-breaker** (removido) — cada chamada tenta a rede direto (com cache + timeout).
 - `PYTHONPATH` baked no `.xlam`: `Z:\AntonioOliveira\AntonioOliveiraCalc`.
+- **Guia dos traders `COMO_USAR.html`** (vai no bundle): paleta Itaú, fonte de dados por fórmula
+  (B3 / FI Analytics / Banco Central / IBGE / cálculo próprio), câmbio rotulado PTAX de venda.
+- **Empacotamento:** um único `.xlam` por versão (`AntonioOliveiraCalc_v1.xlam`); a versão é a
+  constante `VERSION` no `AntonioOliveiraCalc.py` (sem arquivo `VERSION` avulso). O
+  `AntonioOliveiraCalc_bundle.py` é **gerado** por `gerar_bundle.py` (gitignored — não versionar).

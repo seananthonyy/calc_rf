@@ -7,6 +7,8 @@ Datas aceitam `"dd/mm/aaaa"`, célula de data ou `HOJE()`.
 
 > **Documentação:** este `README.md` cobre uso, instalação e operação. Detalhes de arquitetura,
 > re-bake do `.xlam` e internals do xlwings estão no `CLAUDE.md` (referência de desenvolvimento).
+> Para os **traders** (guia visual, sem jargão, com a fonte de cada fórmula), abrir o
+> **`COMO_USAR.html`** no navegador.
 
 ---
 
