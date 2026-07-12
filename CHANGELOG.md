@@ -4,6 +4,11 @@ Versionamento: a **lógica** (`.py`) é retrocompatível (só adiciona UDF, nunc
 o **`.xlam` é versionado por nome de arquivo** (`AntonioOliveiraCalc_v{N}.xlam`). Versões antigas
 ficam na share e nunca são apagadas. `VERSION` no `AntonioOliveiraCalc.py` acompanha a lógica.
 
+## v2.0.2 — 2026-07-12
+- **`cpGrossUp` e `cpDv01` agora EXIGEM a taxa** (antes usavam a de emissão por padrão). Gross up e
+  DV01 dependem da taxa negociada (ex.: ISAEC2 gross up 6%→0,0759, 12%→0,1425), então sem taxa dava
+  um número enganoso. Sem taxa → "ERRO: informe a taxa". *(só `.py`.)*
+
 ## v2.0.1 — 2026-07-12
 - **Fix `cpFluxoCompleto`:** agenda **agregada por DATA** — o vencimento não duplica mais (a
   amortização final `A` e o cupom `J` do mesmo dia viram UMA linha); linhas puras de cupom (0/0)

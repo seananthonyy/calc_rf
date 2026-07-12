@@ -15,7 +15,7 @@ _EXCEL_EPOCH = date_type(1899, 12, 30)
 
 # Versão da lógica (.py). O .xlam é versionado por NOME de arquivo (AntonioOliveiraCalc_vN.xlam);
 # a lógica aqui é retrocompatível (só adiciona UDF, nunca remove/renomeia) — ver CHANGELOG.md.
-VERSION = "2.0.1"
+VERSION = "2.0.2"
 
 # Todas as UDFs têm o prefixo cp (ex.: =cpPu, =cpTaxa, =cpVna...).
 # Títulos com API (debênture, CRI/CRA, NTN-B…): via B3 → FI Analytics → bondbuilder.
@@ -341,12 +341,15 @@ def cpAniversario(ticker):
 @xw.func
 @xw.arg('taxa', numbers=float)
 def cpGrossUp(ticker, data, taxa=None):
-    """Gross up / taxa equivalente após imposto (FI 'taxedM2MRate'). Veja o tipo em =cpGrossUpTipo."""
+    """Gross up / taxa equivalente após imposto (FI 'taxedM2MRate'). PRECISA da taxa
+    (o gross up depende da taxa negociada). Veja o tipo em =cpGrossUpTipo."""
     if _IMPORT_ERROR:
         return f"ERRO import: {_IMPORT_ERROR}"
     try:
+        if _vazio(taxa):
+            return "ERRO: informe a taxa"
         ticker = str(ticker).upper().strip()
-        v = CampoFi(ticker, _data_iso(data), _resolve_taxa(ticker, taxa), "taxedM2MRate")
+        v = CampoFi(ticker, _data_iso(data), _pct(taxa), "taxedM2MRate")
         return float(v) if v is not None else "ERRO: gross up indisponível (FI)"
     except Exception as e:
         return _erro("grossup", e)
@@ -369,12 +372,14 @@ def cpGrossUpTipo(ticker, data, taxa=None):
 @xw.func
 @xw.arg('taxa', numbers=float)
 def cpDv01(ticker, data, taxa=None):
-    """DV01 — variação do PU por 1 bp na taxa (FI Analytics)."""
+    """DV01 — variação do PU por 1 bp na taxa (FI Analytics). PRECISA da taxa."""
     if _IMPORT_ERROR:
         return f"ERRO import: {_IMPORT_ERROR}"
     try:
+        if _vazio(taxa):
+            return "ERRO: informe a taxa"
         ticker = str(ticker).upper().strip()
-        v = CampoFi(ticker, _data_iso(data), _resolve_taxa(ticker, taxa), "dv01")
+        v = CampoFi(ticker, _data_iso(data), _pct(taxa), "dv01")
         return float(v) if v is not None else "ERRO: indisponível (FI)"
     except Exception as e:
         return _erro("dv01", e)
