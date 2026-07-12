@@ -117,11 +117,11 @@ Feche e reabra o Excel:
 | `=cpPupar(ticker; data; [taxa%])` | PU Par (valor nominal atualizado + juros) |
 | `=cpVna(ticker; data; [taxa%])` | VNA — Valor Nominal Atualizado |
 | `=cpFluxo(ticker; data; [taxa%])` | Fluxo de caixa **RESTANTE** calculado (spill): Data · Tipo · Prazo(DU) · VF · VP |
-| `=cpFluxoCompleto(ticker)` | **Agenda CADASTRADA inteira** (spill): Data · Tipo · %Amort · %Incorp (datas em dia útil) |
+| `=cpFluxoCompleto(ticker)` | **Agenda CADASTRADA** (spill): Data · %Amort · %Incorp (datas em dia útil) |
 | `=cpVencimento(ticker)` | Data de vencimento |
 | `=cpEmissao(ticker)` | Data de emissão |
 | `=cpInicio(ticker)` | Data de início de rentabilidade |
-| `=cpTaxaEmissao(ticker)` | Taxa de emissão (unidade nativa: 113.5 = %DI, 6.4618 = IPCA+) |
+| `=cpTaxaEmissao(ticker)` | Taxa de emissão em **decimal** (6,4618% → 0,064618; %DI → 1,135) |
 | `=cpVne(ticker)` | Valor Nominal de Emissão |
 | `=cpAniversario(ticker)` | Dia de aniversário |
 
@@ -140,8 +140,8 @@ Feche e reabra o Excel:
 | `=cpDiPerc(ticker; data; [taxa%])` | % do DI equivalente (1.135 = 113,5%) |
 | `=cpSpreadDi(ticker; data; [taxa%])` | Spread sobre o DI |
 
-### Indicadores — Banco Central / IBGE (todas com `[data]` opcional = as-of)
-Sem `[data]` → valor mais recente. Com `[data]` → último valor publicado **até** a data (cobre
+### Indicadores — Banco Central / IBGE (data OBRIGATÓRIA = as-of)
+**Data obrigatória** — retorna o último valor publicado **até** a data (cobre
 fim de semana/feriado e séries mensais). Ex.: `=cpSelic("31/12/2020")` → 2,0.
 
 | Função | Série |

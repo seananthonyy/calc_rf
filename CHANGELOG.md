@@ -4,6 +4,13 @@ Versionamento: a **lógica** (`.py`) é retrocompatível (só adiciona UDF, nunc
 o **`.xlam` é versionado por nome de arquivo** (`AntonioOliveiraCalc_v{N}.xlam`). Versões antigas
 ficam na share e nunca são apagadas. `VERSION` no `AntonioOliveiraCalc.py` acompanha a lógica.
 
+## v1.0.1 — 2026-07-12 (logic-only — sem re-bake; .xlam segue _v1)
+- **Fix:** cpGrossUp/cpGrossUpTipo/cpConvexidade/cpDv01/cpDurMod/cpDiPerc/cpSpreadDi quebravam com
+  `name 'CampoFi' is not defined` — `CampoFi` agora importado do `apis.py`.
+- `cpTaxaEmissao` passa a retornar em **decimal** (6,4618% → 0,064618; %DI 113,5% → 1,135).
+- `cpFluxoCompleto`: saída enxugada para **Data · %Amort · %Incorp** (removida a coluna Tipo).
+- Funções BCB/IBGE agora **exigem data** (as-of); sem data → "ERRO: informe a data".
+
 ## v1.0.0 — 2026-07-12
 - **Nova UDF `=cpFluxoCompleto(ticker)`**: agenda cadastrada inteira do papel (B3 `getBondDetails`),
   spill `Data · Tipo · %Amort · %Incorp`, datas ajustadas por dia útil (ANBIMA). Distingue

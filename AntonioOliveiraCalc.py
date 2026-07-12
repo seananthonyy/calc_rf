@@ -15,7 +15,7 @@ _EXCEL_EPOCH = date_type(1899, 12, 30)
 
 # Versão da lógica (.py). O .xlam é versionado por NOME de arquivo (AntonioOliveiraCalc_vN.xlam);
 # a lógica aqui é retrocompatível (só adiciona UDF, nunca remove/renomeia) — ver CHANGELOG.md.
-VERSION = "1.0.0"
+VERSION = "1.0.1"
 
 # Todas as UDFs têm o prefixo cp (ex.: =cpPu, =cpTaxa, =cpVna...).
 # Títulos com API (debênture, CRI/CRA, NTN-B…): via B3 → FI Analytics → bondbuilder.
@@ -25,7 +25,7 @@ _IMPORT_ERROR = None
 try:
     from apis import (
         Preco, TaxaOp, LimparCache, FatorDi,
-        CampoBond, FluxoRestante, FluxoCadastrado, BcbValor, IpcaIndice,
+        CampoBond, CampoFi, FluxoRestante, FluxoCadastrado, BcbValor, IpcaIndice,
     )
     import di
 except Exception as _e:
@@ -243,20 +243,19 @@ def _ajusta_du_iso(iso):
 
 @xw.func
 def cpFluxoCompleto(ticker):
-    """Agenda CADASTRADA completa do papel (B3 getBondDetails, spill):
-    Data | Tipo | %Amort | %Incorp. Datas ajustadas p/ dia útil (feriados ANBIMA).
-    Tipos: Amortizacao, Incorporacao (só IPCA-I), Cupom, Vencimento.
-    (=cpFluxo é o fluxo de caixa RESTANTE calculado; este é a agenda cadastrada inteira.)"""
+    """Agenda CADASTRADA do papel (B3 getBondDetails, spill): Data | %Amort | %Incorp.
+    Datas ajustadas p/ dia útil (feriados ANBIMA). Incorporação só aparece em papéis IPCA-I;
+    linhas de cupom puro saem com 0/0. (=cpFluxo é o fluxo de caixa RESTANTE calculado.)"""
     if _IMPORT_ERROR:
         return [[f"ERRO import: {_IMPORT_ERROR}"]]
     try:
         ag = FluxoCadastrado(str(ticker).upper().strip())
         if not ag:
             return [["ERRO: agenda indisponível (B3 getBondDetails)"]]
-        linhas = [["Data", "Tipo", "%Amort", "%Incorp"]]
+        linhas = [["Data", "%Amort", "%Incorp"]]
         for e in ag:
             linhas.append([
-                _data_saida(_ajusta_du_iso(e["data"])), e["tipo"], e["amort"], e["incorp"],
+                _data_saida(_ajusta_du_iso(e["data"])), e["amort"], e["incorp"],
             ])
         return linhas
     except Exception as e:
@@ -301,12 +300,12 @@ def cpInicio(ticker):
 
 @xw.func
 def cpTaxaEmissao(ticker):
-    """Taxa de emissão do papel em unidade nativa (ex.: 113.5 para %DI, 6.4618 para IPCA+)."""
+    """Taxa de emissão do papel em DECIMAL (ex.: 6,4618% → 0,064618; %DI 113,5% → 1,135)."""
     if _IMPORT_ERROR:
         return f"ERRO import: {_IMPORT_ERROR}"
     try:
         v = CampoBond(str(ticker).upper().strip(), "yield")
-        return float(v) if v is not None else "ERRO: taxa de emissão indisponível"
+        return float(v) / 100 if v is not None else "ERRO: taxa de emissão indisponível"
     except Exception as e:
         return _erro("taxaEmi", e)
 
@@ -461,7 +460,9 @@ def cpCdi(dataInicio, dataFim, percentual=100):
 # =============================================================================
 
 def _bcb_valor(serie, data=None):
-    v = BcbValor(serie, _data_br(data) if not _vazio(data) else None)
+    if _vazio(data):
+        return "ERRO: informe a data"
+    v = BcbValor(serie, _data_br(data))
     return float(v) if v is not None else "ERRO: BCB sem dado"
 
 
@@ -473,7 +474,7 @@ def _data_br(data):
 # dia exato (fim de semana/feriado ou série mensal), retorna o último valor ATÉ a data.
 @xw.func
 def cpSelic(data=None):
-    """Meta SELIC (% a.a.) — BCB série 432. [data] opcional (último por padrão)."""
+    """Meta SELIC (% a.a.) — BCB série 432. data OBRIGATÓRIA (as-of: último valor até a data)."""
     if _IMPORT_ERROR:
         return f"ERRO import: {_IMPORT_ERROR}"
     try:
@@ -484,7 +485,7 @@ def cpSelic(data=None):
 
 @xw.func
 def cpSelicOver(data=None):
-    """SELIC over anualizada (% a.a.) — BCB série 1178. [data] opcional."""
+    """SELIC over anualizada (% a.a.) — BCB série 1178 (data obrigatória, as-of)."""
     if _IMPORT_ERROR:
         return f"ERRO import: {_IMPORT_ERROR}"
     try:
@@ -495,7 +496,7 @@ def cpSelicOver(data=None):
 
 @xw.func
 def cpCdiAno(data=None):
-    """CDI anualizado, base 252 (% a.a.) — BCB série 4389. [data] opcional."""
+    """CDI anualizado, base 252 (% a.a.) — BCB série 4389 (data obrigatória, as-of)."""
     if _IMPORT_ERROR:
         return f"ERRO import: {_IMPORT_ERROR}"
     try:
@@ -506,7 +507,7 @@ def cpCdiAno(data=None):
 
 @xw.func
 def cpCdiDia(data=None):
-    """CDI do dia (% ao dia) — BCB série 12. [data] opcional."""
+    """CDI do dia (% ao dia) — BCB série 12 (data obrigatória, as-of)."""
     if _IMPORT_ERROR:
         return f"ERRO import: {_IMPORT_ERROR}"
     try:
@@ -528,7 +529,7 @@ def cpIpca(data=None):
 
 @xw.func
 def cpIpcaAno(data=None):
-    """IPCA acumulado em 12 meses (%) — BCB série 13522. [data] opcional."""
+    """IPCA acumulado em 12 meses (%) — BCB série 13522 (data obrigatória, as-of)."""
     if _IMPORT_ERROR:
         return f"ERRO import: {_IMPORT_ERROR}"
     try:
@@ -545,7 +546,9 @@ def cpIpcaIndice(data=None):
     if _IMPORT_ERROR:
         return f"ERRO import: {_IMPORT_ERROR}"
     try:
-        v = IpcaIndice(_data_br(data) if not _vazio(data) else None)
+        if _vazio(data):
+            return "ERRO: informe a data"
+        v = IpcaIndice(_data_br(data))
         return float(v) if v is not None else "ERRO: SIDRA sem dado"
     except Exception as e:
         return _erro("ipcaindice", e)
@@ -553,7 +556,7 @@ def cpIpcaIndice(data=None):
 
 @xw.func
 def cpIgpm(data=None):
-    """IGP-M do mês (% no mês) — BCB série 189. [data] opcional."""
+    """IGP-M do mês (% no mês) — BCB série 189 (data obrigatória, as-of)."""
     if _IMPORT_ERROR:
         return f"ERRO import: {_IMPORT_ERROR}"
     try:
@@ -564,7 +567,7 @@ def cpIgpm(data=None):
 
 @xw.func
 def cpIgpDi(data=None):
-    """IGP-DI do mês (% no mês) — BCB série 190. [data] opcional."""
+    """IGP-DI do mês (% no mês) — BCB série 190 (data obrigatória, as-of)."""
     if _IMPORT_ERROR:
         return f"ERRO import: {_IMPORT_ERROR}"
     try:
@@ -575,7 +578,7 @@ def cpIgpDi(data=None):
 
 @xw.func
 def cpInpc(data=None):
-    """INPC do mês (% no mês) — BCB série 188. [data] opcional."""
+    """INPC do mês (% no mês) — BCB série 188 (data obrigatória, as-of)."""
     if _IMPORT_ERROR:
         return f"ERRO import: {_IMPORT_ERROR}"
     try:
@@ -586,7 +589,7 @@ def cpInpc(data=None):
 
 @xw.func
 def cpIpca15(data=None):
-    """IPCA-15 do mês (% no mês) — BCB série 7478. [data] opcional."""
+    """IPCA-15 do mês (% no mês) — BCB série 7478 (data obrigatória, as-of)."""
     if _IMPORT_ERROR:
         return f"ERRO import: {_IMPORT_ERROR}"
     try:
@@ -597,7 +600,7 @@ def cpIpca15(data=None):
 
 @xw.func
 def cpPoupanca(data=None):
-    """Rendimento da poupança (% a.m.) — BCB série 196. [data] opcional."""
+    """Rendimento da poupança (% a.m.) — BCB série 196 (data obrigatória, as-of)."""
     if _IMPORT_ERROR:
         return f"ERRO import: {_IMPORT_ERROR}"
     try:
@@ -608,7 +611,7 @@ def cpPoupanca(data=None):
 
 @xw.func
 def cpTr(data=None):
-    """TR — Taxa Referencial (%) — BCB série 226. [data] opcional."""
+    """TR — Taxa Referencial (%) — BCB série 226 (data obrigatória, as-of)."""
     if _IMPORT_ERROR:
         return f"ERRO import: {_IMPORT_ERROR}"
     try:
@@ -619,7 +622,7 @@ def cpTr(data=None):
 
 @xw.func
 def cpDolar(data=None):
-    """Dólar PTAX venda (R$) — BCB série 1. [data] opcional (último por padrão)."""
+    """Dólar PTAX venda (R$) — BCB série 1. data OBRIGATÓRIA (as-of: último valor até a data)."""
     if _IMPORT_ERROR:
         return f"ERRO import: {_IMPORT_ERROR}"
     try:
@@ -630,7 +633,7 @@ def cpDolar(data=None):
 
 @xw.func
 def cpEuro(data=None):
-    """Euro venda (R$) — BCB série 21619. [data] opcional (último por padrão)."""
+    """Euro venda (R$) — BCB série 21619. data OBRIGATÓRIA (as-of: último valor até a data)."""
     if _IMPORT_ERROR:
         return f"ERRO import: {_IMPORT_ERROR}"
     try:
