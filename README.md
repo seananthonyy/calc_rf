@@ -1,4 +1,4 @@
-# AntonioOliveiraCalc — Add-in de Renda Fixa para Excel
+# CalcCP — Add-in de Renda Fixa para Excel
 
 Add-in de planilha (UDFs) para precificar renda fixa e puxar indicadores. Todas as funções têm o
 prefixo **`cp`** (ex.: `=cpPu`). As fontes são as APIs **B3 Calculator**, **FI Analytics** e
@@ -30,19 +30,19 @@ Datas aceitam `"dd/mm/aaaa"`, célula de data ou `HOJE()`.
    python -c "import xlwings,os,sys,glob; r=os.path.dirname(sys.executable); print(xlwings.__version__); print(glob.glob(os.path.join(r,'xlwings*.dll')))"
    ```
    Esperado: `0.36.6` e a lista com `xlwings64-0.36.6.dll`. Se não, ver [erro de DLL](#erro-file-not-found-xlwings64-0366dll).
-3. **A pasta do add-in na share, em `Z:\AntonioOliveira\AntonioOliveiraCalc`** — é o `PYTHONPATH`
+3. **A pasta do add-in na share, em `Z:\CP\CalcCP`** — é o `PYTHONPATH`
    embutido no `.xlam` (tem que ser ESSE caminho). Conteúdo mínimo:
-   `AntonioOliveiraCalc_v1.xlam`, `AntonioOliveiraCalc.py`, `apis.py`, `di.py`, `config.py`,
-   `feriados_anbima.csv`. Puxar do repositório do projeto (ou extrair o `AntonioOliveiraCalc_bundle.py`).
+   `CalcCP_v1.xlam`, `CalcCP.py`, `apis.py`, `di.py`, `config.py`,
+   `feriados_anbima.csv`. Puxar do repositório do projeto (ou extrair o `CalcCP_bundle.py`).
 
 ---
 
 ## Instalar no banco
 
 ### 1. Colocar a pasta na share
-Garanta que `Z:\AntonioOliveira\AntonioOliveiraCalc` existe com os arquivos acima. A share precisa
-estar acessível quando o Excel abre. (Alternativa rápida: jogue só o `AntonioOliveiraCalc_bundle.py`
-na pasta e rode `python AntonioOliveiraCalc_bundle.py` — ele extrai tudo.)
+Garanta que `Z:\CP\CalcCP` existe com os arquivos acima. A share precisa
+estar acessível quando o Excel abre. (Alternativa rápida: jogue só o `CalcCP_bundle.py`
+na pasta e rode `python CalcCP_bundle.py` — ele extrai tudo.)
 
 > **Atualizar depois** = baixar o bundle novo na share e rodar de novo. Ele **pula todo arquivo que
 > já está idêntico**, então o `.xlam` — que só muda quando há UDF/assinatura nova — não é reescrito e
@@ -69,9 +69,11 @@ Excel → Opções → **Central de Confiabilidade** → Configurações de Macr
 
 ### 4. Habilitar o add-in
 Excel → Opções → **Suplementos** → "Suplementos do Excel" → **Ir...** → **Procurar** →
-selecionar `Z:\AntonioOliveira\AntonioOliveiraCalc\AntonioOliveiraCalc_v1.xlam` → OK.
+selecionar `Z:\CP\CalcCP\CalcCP_v1.xlam` → OK.
 As UDFs já vêm **registradas** no `.xlam` (não precisa "Import Functions"). Aparece a aba
-**AntonioOliveiraCalc** no ribbon.
+**CalcCP** no ribbon, com o botão **Sobre** — que mostra a versão da lógica, a pasta de onde o
+add-in está lendo, o Python em uso e o estado do import. Como ele roda o Python de verdade
+(`RunPython`), serve também de diagnóstico: se a ponte estiver quebrada, o erro aparece ali.
 
 ### 5. (Só se o PC tiver vários Python) Fixar o Python certo
 Criar `%USERPROFILE%\.myaddin\myaddin.conf` com **uma linha**:
@@ -93,17 +95,17 @@ Esse arquivo é **por PC e por usuário** (não vai pro repositório).
 ### 6. Testar
 Feche e reabra o Excel:
 ```
-=cpTeste()                              -> OK v1.0.0 — path: Z:\AntonioOliveira\AntonioOliveiraCalc
+=cpTeste()                              -> OK v1.1.0 — path: Z:\CP\CalcCP
 =cpPu("FGEN13"; "13/06/2025"; 6,4686%)  -> ~961,70
 =cpPu("DI1F27"; "01/07/2026"; 10%)      -> ~95310,20   (DI, cálculo local)
 ```
 
 ### Checklist (por PC)
-- [ ] Pasta em `Z:\AntonioOliveira\AntonioOliveiraCalc` atualizada
+- [ ] Pasta em `Z:\CP\CalcCP` atualizada
 - [ ] Python 64-bit com xlwings **0.36.6** + DLL na raiz
 - [ ] `token_calc_b3`, `token_fianalytics`, `proxy_http`, `proxy_https` setados
 - [ ] "Confiar no acesso ao modelo de objeto de projeto do VBA" ligado
-- [ ] `.xlam` habilitado (aba **AntonioOliveiraCalc** aparece)
+- [ ] `.xlam` habilitado (aba **CalcCP** aparece)
 - [ ] (se multi-Python) `myaddin.conf` com a chave `Interpreter`
 - [ ] `=cpPu("FGEN13";"13/06/2025";6,4686%)` ≈ 961,70
 
@@ -195,8 +197,8 @@ renomeia** (senão quebra planilhas e `.xlam` antigos). O **`.xlam` é versionad
 
 | Mudou | O que fazer | Efeito nos usuários |
 |---|---|---|
-| **Lógica** (`apis.py`, `AntonioOliveiraCalc.py`, `di.py`) | colar o `.py` novo na share (`git pull`, ou rodar o bundle) | reabrir o Excel — **nada quebra** |
-| **Nova UDF / assinatura** (precisa re-bake) | gerar `AntonioOliveiraCalc_v{N+1}.xlam` (arquivo **novo**), atualizar `VERSION` no `.py`, rodar `python gerar_bundle.py`, registrar `CHANGELOG.md` | quem quiser o novo registra o `_vN+1`; **o `_vN` antigo fica na share e continua funcionando** |
+| **Lógica** (`apis.py`, `CalcCP.py`, `di.py`) | colar o `.py` novo na share (`git pull`, ou rodar o bundle) | reabrir o Excel — **nada quebra** |
+| **Nova UDF / assinatura** (precisa re-bake) | gerar `CalcCP_v{N+1}.xlam` (arquivo **novo**), atualizar `VERSION` no `.py`, rodar `python gerar_bundle.py`, registrar `CHANGELOG.md` | quem quiser o novo registra o `_vN+1`; **o `_vN` antigo fica na share e continua funcionando** |
 
 > Por isso os `.xlam` **nunca são apagados/sobrescritos**: cada versão é um arquivo novo
 > (`_v1`, `_v2`, …). Assim ninguém no banco fica com o add-in quebrado, e você nunca precisa deletar

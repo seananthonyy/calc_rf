@@ -13,9 +13,9 @@ import xlwings as xw
 # Epoch do serial de datas do Excel (Windows): base efetiva 30/12/1899.
 _EXCEL_EPOCH = date_type(1899, 12, 30)
 
-# Versão da lógica (.py). O .xlam é versionado por NOME de arquivo (AntonioOliveiraCalc_vN.xlam);
+# Versão da lógica (.py). O .xlam é versionado por NOME de arquivo (CalcCP_vN.xlam);
 # a lógica aqui é retrocompatível (só adiciona UDF, nunca remove/renomeia) — ver CHANGELOG.md.
-VERSION = "1.0.2"
+VERSION = "1.1.0"
 
 # Todas as UDFs têm o prefixo cp (ex.: =cpPu, =cpTaxa, =cpVna...).
 # Títulos com API (debênture, CRI/CRA, NTN-B…): via B3 → FI Analytics → bondbuilder.
@@ -89,7 +89,7 @@ def _erro(pref, e):
 def main():
     """Handler do botão 'Run' do ribbon (opcional)."""
     xw.apps.active.selection.cells(1, 1).value = (
-        "AntonioOliveiraCalc — use =cpPu, =cpTaxa, =cpVna, =cpFluxo, =cpSelic… (prefixo cp)"
+        "CalcCP — use =cpPu, =cpTaxa, =cpVna, =cpFluxo, =cpSelic… (prefixo cp)"
     )
 
 
@@ -112,6 +112,27 @@ def cpLimparCache():
         return f"ERRO import: {_IMPORT_ERROR}"
     LimparCache()
     return "cache limpo"
+
+
+def Sobre():
+    """Caixa 'Sobre' do botão do ribbon (chamada por RunPython, não é UDF).
+
+    Mostra a versão da LÓGICA (deste .py) — que é o que muda quando a pasta da share é
+    atualizada —, a pasta de onde o add-in está lendo e o estado do import. Como roda o
+    Python de verdade, se a ponte estiver quebrada o erro aparece aqui."""
+    import ctypes
+    udfs = sorted(n for n, v in globals().items() if n.startswith("cp") and callable(v))
+    estado = f"ERRO no import: {_IMPORT_ERROR}" if _IMPORT_ERROR else "APIs carregadas (B3 / FI / BCB / IBGE)"
+    texto = (
+        f"CalcCP — Renda Fixa no Excel\n\n"
+        f"Versão da lógica:  {VERSION}\n"
+        f"Fórmulas:          {len(udfs)} (todas com prefixo cp)\n"
+        f"Estado:            {estado}\n\n"
+        f"Pasta:\n{_THIS_DIR}\n\n"
+        f"Python:\n{sys.executable}\n\n"
+        f"Guia de uso: abra o COMO_USAR.html que está na pasta acima."
+    )
+    ctypes.windll.user32.MessageBoxW(0, texto, "CalcCP", 0x40)  # 0x40 = ícone de informação
 
 
 # =============================================================================

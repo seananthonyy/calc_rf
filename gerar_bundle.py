@@ -1,11 +1,11 @@
-"""Gera o AntonioOliveiraCalc_bundle.py (auto-extrator self-contained) a partir dos
+"""Gera o CalcCP_bundle.py (auto-extrator self-contained) a partir dos
 arquivos atuais do add-in. Rode SEMPRE que mudar o .py, apis.py, di.py, config.py,
 o .csv ou o .xlam (nova versão):
 
     python gerar_bundle.py
 
 O bundle embute cada arquivo em base64 e, ao ser rodado, escreve tudo na pasta atual.
-Inclui o .xlam VERSIONADO (AntonioOliveiraCalc_v{VERSION}.xlam)."""
+Inclui o .xlam VERSIONADO (CalcCP_v{VERSION}.xlam)."""
 import base64
 import os
 import re
@@ -14,21 +14,21 @@ AQUI = os.path.dirname(os.path.abspath(__file__))
 
 
 def _versao():
-    txt = open(os.path.join(AQUI, "AntonioOliveiraCalc.py"), encoding="utf-8").read()
+    txt = open(os.path.join(AQUI, "CalcCP.py"), encoding="utf-8").read()
     m = re.search(r'VERSION\s*=\s*"([^"]+)"', txt)
     if not m:
-        raise SystemExit("VERSION nao encontrada em AntonioOliveiraCalc.py — "
+        raise SystemExit("VERSION nao encontrada em CalcCP.py — "
                          "a copia nesta pasta e antiga (anterior a v1.0.0).")
     return m.group(1)
 
 
 VERSION = _versao()
-XLAM = f"AntonioOliveiraCalc_v{VERSION.split('.')[0]}.xlam"   # ex.: _v1.xlam
+XLAM = f"CalcCP_v{VERSION.split('.')[0]}.xlam"   # ex.: _v1.xlam
 
-# Arquivos que vão pra share (Z:\AntonioOliveira\AntonioOliveiraCalc):
+# Arquivos que vão pra share (Z:\CP\CalcCP):
 ARQUIVOS = [
     XLAM,
-    "AntonioOliveiraCalc.py",
+    "CalcCP.py",
     "apis.py",
     "di.py",
     "config.py",
@@ -37,15 +37,15 @@ ARQUIVOS = [
 ]
 
 CABECALHO = f'''"""
-AntonioOliveiraCalc — AUTO-EXTRATOR (bundle self-contained) — v{VERSION}
+CalcCP — AUTO-EXTRATOR (bundle self-contained) — v{VERSION}
 =======================================================================
 Baixe SÓ este arquivo, jogue na pasta destino e rode:
 
-    python AntonioOliveiraCalc_bundle.py
+    python CalcCP_bundle.py
 
 Escreve todos os arquivos do add-in na pasta atual (ou passe outra pasta como arg).
 Os .py + o .csv precisam ficar no PYTHONPATH que o .xlam espera:
-    Z:/AntonioOliveira/AntonioOliveiraCalc   (baked no .xlam, com barra invertida)
+    Z:/CP/CalcCP   (baked no .xlam, com barra invertida)
 Se a share do banco tiver outro caminho, o .xlam precisa ser re-baked com o path certo.
 
 O .xlam é VERSIONADO ({XLAM}) — instalar/registrar ESTE arquivo. Versões antigas
@@ -97,7 +97,7 @@ def main():
         print("\\n*** NAO FOI POSSIVEL ESCREVER (arquivo em uso): " + ", ".join(travados))
         print("*** Esses arquivos MUDARAM e estao travados — feche o Excel e rode de novo.")
         sys.exit(1)
-    print("Lembre: essa pasta precisa ser Z:\\\\AntonioOliveira\\\\AntonioOliveiraCalc "
+    print("Lembre: essa pasta precisa ser Z:\\\\CP\\\\CalcCP "
           "(ou re-bake o .xlam com o path certo).")
 
 if __name__ == "__main__":
@@ -114,7 +114,7 @@ def main():
         b64 = base64.b64encode(open(caminho, "rb").read()).decode("ascii")
         partes.append(f"    {nome!r}: {b64!r},\n")
     partes.append(RODAPE)
-    saida = os.path.join(AQUI, "AntonioOliveiraCalc_bundle.py")
+    saida = os.path.join(AQUI, "CalcCP_bundle.py")
     with open(saida, "w", encoding="utf-8", newline="\n") as f:
         f.write("".join(partes))
     print(f"bundle gerado: {saida}  (v{VERSION}, {len(ARQUIVOS)} arquivos, xlam={XLAM})")

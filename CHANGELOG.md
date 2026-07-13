@@ -1,8 +1,30 @@
-# CHANGELOG — AntonioOliveiraCalc
+# CHANGELOG — CalcCP
 
 Versionamento: a **lógica** (`.py`) é retrocompatível; o **`.xlam` é versionado por nome de arquivo**
-(`AntonioOliveiraCalc_vN.xlam`) — versões antigas ficam na share e não quebram quem já usa.
-`VERSION` no `AntonioOliveiraCalc.py` acompanha a lógica.
+(`CalcCP_vN.xlam`) — versões antigas ficam na share e não quebram quem já usa.
+`VERSION` no `CalcCP.py` acompanha a lógica.
+
+## v1.1.0 — 2026-07-13 — renomeado para **CalcCP** + nova pasta na share
+
+**O add-in deixa de se chamar `AntonioOliveiraCalc` e passa a ser `CalcCP`** (nome pessoal num
+utilitário usado pelo time todo). **As fórmulas NÃO mudam** — seguem todas com prefixo `cp`
+(`=cpPu`, `=cpTaxa`, …), então nenhuma planilha quebra.
+
+| | Antes | Agora |
+|---|---|---|
+| Pasta na share | `Z:\AntonioOliveira\AntonioOliveiraCalc` | **`Z:\CP\CalcCP`** |
+| Add-in (.xlam) | `AntonioOliveiraCalc_v1.xlam` | **`CalcCP_v1.xlam`** |
+| Módulo Python | `AntonioOliveiraCalc.py` | **`CalcCP.py`** |
+| Bundle | `AntonioOliveiraCalc_bundle.py` | **`CalcCP_bundle.py`** |
+| Aba do ribbon | AntonioOliveiraCalc | **CalcCP** |
+
+- **Botão "Sobre" no ribbon** (novo): mostra versão da lógica, nº de fórmulas, pasta, Python e estado
+  do import. Substitui o botão "Run" do template do xlwings, que chamava um `main()` inexistente.
+  Roda via `RunPython` → também serve de diagnóstico da ponte Excel↔Python.
+- **Exige re-registrar o add-in** (Opções → Suplementos → Procurar → `Z:\CP\CalcCP\CalcCP_v1.xlam`).
+  Não tem como evitar: o `.xlam` mudou de lugar, e o PYTHONPATH da share é **baked** dentro dele.
+- Re-bake feito com o módulo novo (`CallUDF("CalcCP", …)`), 32 UDFs conferidas via COM. `.xlam`
+  higienizado: 0 PII, 0 `ItauBBA` (removido o `absPath` que o Excel injeta no save — o repo é público).
 
 ## v1.0.2 — 2026-07-13
 **`cpGrossUp`, `cpGrossUpTipo` e `cpDv01` passam a funcionar em papel do bondbuilder** (LCD, LF,
@@ -59,9 +81,9 @@ Add-in `cp*` API-only (B3 → FI → bondbuilder; DI local; BCB/SGS; IBGE SIDRA)
   `cpDiaUtilAnterior`, `cpDiaUtilMaisN`.
 - **Diagnóstico:** `cpTeste` (mostra a versão), `cpLimparCache`.
 - `apis.py` **sem circuit-breaker** (removido) — cada chamada tenta a rede direto (com cache + timeout).
-- `PYTHONPATH` baked no `.xlam`: `Z:\AntonioOliveira\AntonioOliveiraCalc`.
+- `PYTHONPATH` baked no `.xlam`: `Z:\CP\CalcCP`.
 - **Guia dos traders `COMO_USAR.html`** (vai no bundle): paleta Itaú, fonte de dados por fórmula
   (B3 / FI Analytics / Banco Central / IBGE / cálculo próprio), câmbio rotulado PTAX de venda.
-- **Empacotamento:** um único `.xlam` por versão (`AntonioOliveiraCalc_v1.xlam`); a versão é a
-  constante `VERSION` no `AntonioOliveiraCalc.py` (sem arquivo `VERSION` avulso). O
-  `AntonioOliveiraCalc_bundle.py` é **gerado** por `gerar_bundle.py` (gitignored — não versionar).
+- **Empacotamento:** um único `.xlam` por versão (`CalcCP_v1.xlam`); a versão é a
+  constante `VERSION` no `CalcCP.py` (sem arquivo `VERSION` avulso). O
+  `CalcCP_bundle.py` é **gerado** por `gerar_bundle.py` (gitignored — não versionar).

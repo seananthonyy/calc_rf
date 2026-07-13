@@ -1,4 +1,4 @@
-# CLAUDE.md — Add-in AntonioOliveiraCalc (calculadora de renda fixa via API)
+# CLAUDE.md — Add-in CalcCP (calculadora de renda fixa via API)
 
 > **Uso e instalação: `README.md`.** Este arquivo é a referência de arquitetura/manutenção (re-bake, xlwings internals).
 
@@ -23,7 +23,7 @@ Documentação técnica para o Claude Code. Leia antes de alterar qualquer coisa
 >
 > **RE-BAKE (obrigatório ao renomear/adicionar UDF):** os nomes das funções ficam baked nos
 > wrappers VBA do `.xlam`. Trocar só o `.py` NÃO basta. Processo (Excel FECHADO): abrir o `.xlam`
-> via COM (`xw.App`), `wb.api.IsAddin=False`, `xlwings.udfs.import_udfs("AntonioOliveiraCalc",
+> via COM (`xw.App`), `wb.api.IsAddin=False`, `xlwings.udfs.import_udfs("CalcCP",
 > wb.api)`, `IsAddin=True`, `save`. Excel injeta PII (`C:\Users\<usuario>`) no `vbaProject.bin` no save
 > → scrub `<usuario>`→`user1` (ascii **e** utf-16). Config (PYTHONPATH) fica na worksheet baked, não no
 > `.bin` → dá para transplantar só o `.bin` novo entre DEV (D:\) e PROD (Z:\). Scripts noturnos:
@@ -37,11 +37,11 @@ Documentação técnica para o Claude Code. Leia antes de alterar qualquer coisa
 ## O que é
 
 Add-in de Excel que expõe 5 funções de planilha (UDFs) para precificar títulos de renda fixa.
-Depois de instalado, a aba do ribbon aparece como **AntonioOliveiraCalc**.
+Depois de instalado, a aba do ribbon aparece como **CalcCP**.
 - **Títulos com API** (debênture, CRI/CRA, NTN-B/NTN-F): números vêm das APIs (B3 Calculator →
   FI Analytics, nessa ordem). Sem leitura de base de dados local.
 - **DI (tickers `DI1...`)**: NÃO existe API → calculado **localmente** em `di.py` (contagem de dias
-  úteis + `feriados_anbima.csv`). O `AntonioOliveiraCalc.py` roteia: se `di.EhTickerDi(ticker)` → local,
+  úteis + `feriados_anbima.csv`). O `CalcCP.py` roteia: se `di.EhTickerDi(ticker)` → local,
   senão → APIs.
 
 | UDF no Excel | Retorno |
@@ -60,22 +60,22 @@ Depois de instalado, a aba do ribbon aparece como **AntonioOliveiraCalc**.
 ## Arquitetura
 
 É um **add-in customizado do xlwings** (gerado por `xlwings quickstart ... --addin --ribbon`):
-- `AntonioOliveiraCalc.xlam` embute o VBA do xlwings + um ribbon + o módulo `xlwings_udfs` (as
+- `CalcCP.xlam` embute o VBA do xlwings + um ribbon + o módulo `xlwings_udfs` (as
   "casquinhas" VBA que chamam o Python). É **standalone**: não depende do add-in genérico do xlwings.
 - Quando o Excel chama uma UDF, o VBA dispara o Python (interpretador configurado), importa o
-  módulo `AntonioOliveiraCalc` e executa a função, que faz a chamada HTTP via `apis.py`.
-- O add-in **adiciona automaticamente a própria pasta ao PYTHONPATH** — por isso `AntonioOliveiraCalc.py`,
+  módulo `CalcCP` e executa a função, que faz a chamada HTTP via `apis.py`.
+- O add-in **adiciona automaticamente a própria pasta ao PYTHONPATH** — por isso `CalcCP.py`,
   `apis.py` e `config.py` ficam todos juntos do `.xlam`.
 
 ### Arquivos
 | Arquivo | Papel | Mexe? |
 |---|---|---|
-| `AntonioOliveiraCalc.py` | as UDFs (`@xw.func`). Roteia DI→`di.py`, resto→`apis.py`. | sim — lógica das funções |
+| `CalcCP.py` | as UDFs (`@xw.func`). Roteia DI→`di.py`, resto→`apis.py`. | sim — lógica das funções |
 | `apis.py` | cliente HTTP B3/FI (urllib, stdlib). Segredos + proxy + cache + normaliza NTN-B/F. | sim — APIs, proxy, parsing |
 | `di.py` | cálculo LOCAL de DI (DI1...). Self-contained (lê `feriados_anbima.csv`). | sim — fórmula/calendário DI |
 | `feriados_anbima.csv` | calendário de feriados (usado pelo `di.py`). | só ao estender datas |
 | `config.py` | só `ENV_PATH` (fallback de dev). | raramente |
-| `AntonioOliveiraCalc.xlam` | o add-in. Binário. | só ao mudar nome/assinatura de UDF (ver abaixo) |
+| `CalcCP.xlam` | o add-in. Binário. | só ao mudar nome/assinatura de UDF (ver abaixo) |
 
 ## Segredos e proxy — via VARIÁVEIS DE AMBIENTE
 
@@ -109,7 +109,7 @@ Depois de instalado, a aba do ribbon aparece como **AntonioOliveiraCalc**.
   (`_PostFiAuto`). Resposta é **double-encoded** (JSON dentro de string). Modo `rate` →
   `m2m`/`maculayDuration`; modo `pu` → `m2mRate`.
 - Datas para a API: formato `YYYY-MM-DD`. No Excel entram como `dd/mm/yyyy`, data nativa OU serial
-  (`TODAY()` aninhado) — `_parse_data` (em `AntonioOliveiraCalc.py`) cobre os três; `_EXCEL_EPOCH=30/12/1899`.
+  (`TODAY()` aninhado) — `_parse_data` (em `CalcCP.py`) cobre os três; `_EXCEL_EPOCH=30/12/1899`.
 - **Roteamento B3→FI** fica em `apis.py`: `Preco()` (taxa→PU) e `TaxaOp()` (PU→taxa). As UDFs
   chamam essas, não `PrecoB3`/`PrecoFi` direto.
 - **Cache em memória** por `(origem, ticker, data, taxa/pu)`, inclusive `None`, p/ não martelar a
@@ -135,10 +135,10 @@ Depois de instalado, a aba do ribbon aparece como **AntonioOliveiraCalc**.
 ## Como ALTERAR (fluxo de trabalho)
 
 ### Mudar lógica/parsing/proxy (caso comum) — NÃO precisa mexer no `.xlam`
-1. Edite `apis.py` ou `AntonioOliveiraCalc.py`.
+1. Edite `apis.py` ou `CalcCP.py`.
 2. Teste por fora (sem Excel):
    ```
-   python -c "import AntonioOliveiraCalc as m; print(m.PU('FGEN13','13/06/2025',0.064686))"
+   python -c "import CalcCP as m; print(m.PU('FGEN13','13/06/2025',0.064686))"
    ```
    (≈ 961,70 para esse caso).
 3. O usuário pega a mudança ao **reabrir o Excel** (o Python recarrega o módulo no novo processo).
@@ -149,7 +149,7 @@ O módulo `xlwings_udfs` (as casquinhas VBA) é **baked no `.xlam`** e difere co
 regenerar o `xlwings_udfs`. Duas formas:
 
 **(1) Manual, no Excel:** com o add-in carregado, **Alt+F11** → módulo `xlwings` do projeto
-`AntonioOliveiraCalc.xlam` → rode a sub **`ImportPythonUDFsToAddin`** (F5) → **Ctrl+S**. Requer "Confiar no
+`CalcCP.xlam` → rode a sub **`ImportPythonUDFsToAddin`** (F5) → **Ctrl+S**. Requer "Confiar no
 acesso ao modelo de objeto do VBA" ligado.
 
 **(2) Via COM, do Python (sem Alt+F11) — foi como o re-bake síncrono foi feito (01/07):**
@@ -157,11 +157,11 @@ chama-se a MESMA função que a sub VBA chama (`xlwings.udfs.import_udfs`). Esqu
 ```python
 import sys, xlwings as xw
 from xlwings import udfs
-sys.path.insert(0, r"<pasta com AntonioOliveiraCalc.py>")   # p/ import_udfs achar o modulo
+sys.path.insert(0, r"<pasta com CalcCP.py>")   # p/ import_udfs achar o modulo
 app = xw.App(visible=True, add_book=False); app.display_alerts = False
-wb = app.books.open(r"<...>\AntonioOliveiraCalc.xlam")
+wb = app.books.open(r"<...>\CalcCP.xlam")
 wb.api.IsAddin = False        # ⚠️ senao MacroOptions falha: "Cannot edit a macro on a hidden workbook"
-udfs.import_udfs("AntonioOliveiraCalc", wb.api)   # = ImportPythonUDFsToAddin (addin:=True -> ThisWorkbook)
+udfs.import_udfs("CalcCP", wb.api)   # = ImportPythonUDFsToAddin (addin:=True -> ThisWorkbook)
 wb.api.IsAddin = True; wb.save(); wb.close(); app.quit()
 ```
 Só o `xl/vbaProject.bin` muda.
@@ -170,15 +170,15 @@ Só o `xl/vbaProject.bin` muda.
 > utf-16-le) e o seu nome no `docProps`. Como o repo é público (ver regras abaixo), **scrub antes de
 > commitar**: substitua `<seu-usuario>`→`user1` no `vbaProject.bin` (mesmo tamanho, preserva offsets).
 > Estratégia usada p/ o PROD: re-bakear num `.xlam` de dev (config local), depois **transplantar só o
-> `vbaProject.bin` síncrono+scrubbado** para o `AntonioOliveiraCalc.xlam` de produção (que mantém o
-> `docProps=AntonioOliveiraCalc` e a config `Z:\` limpos). Assim o PROD nunca reabre no Excel → não pega PII nova.
+> `vbaProject.bin` síncrono+scrubbado** para o `CalcCP.xlam` de produção (que mantém o
+> `docProps=CalcCP` e a config `Z:\` limpos). Assim o PROD nunca reabre no Excel → não pega PII nova.
 
 3. Distribua o `.xlam` novo (commit + o banco dá `git pull`). No banco, reabrir o Excel basta.
 
 ## Planilha do SharePoint/OneDrive CONGELA o Excel ao usar uma UDF
 
 > ✅ **JÁ APLICADO neste `.xlam`** (30/06): o sheet `myaddin.conf` embutido tem
-> `ADD_WORKBOOK_TO_PYTHONPATH=false` e `PYTHONPATH=Z:\AntonioOliveira\AntonioOliveiraCalc`. Funciona com o
+> `ADD_WORKBOOK_TO_PYTHONPATH=false` e `PYTHONPATH=Z:\CP\CalcCP`. Funciona com o
 > add-in carregado **desse caminho fixo**. Se a pasta mudar, edite o valor de `PYTHONPATH` no
 > sheet `myaddin.conf` (ou via o script `scratchpad/bake_config.py`). Abaixo, a explicação/teoria.
 
@@ -201,7 +201,7 @@ PYTHONPATH = <pasta do add-in>       # re-adiciona a pasta dos .py (o item acima
    `myaddin`), formato `"Chave","Valor"`:
    ```
    "ADD_WORKBOOK_TO_PYTHONPATH","false"
-   "PYTHONPATH","C:\caminho\para\AntonioOliveiraCalc"
+   "PYTHONPATH","C:\caminho\para\CalcCP"
    ```
    Implantar via login script / GPO, ou criar à mão. Simples, mas é um arquivo por usuário.
 
@@ -255,6 +255,6 @@ ALTERAR" (2)). Paliativo enquanto não atualiza: cálculo em **Manual (F9)**.
 
 ## Teste rápido (sanity)
 ```
-python -c "import AntonioOliveiraCalc as m; print(m.TESTE()); print(m.PU('FGEN13','13/06/2025',0.064686))"
+python -c "import CalcCP as m; print(m.TESTE()); print(m.PU('FGEN13','13/06/2025',0.064686))"
 ```
 Esperado: `OK — path: <esta pasta>` e `961.699686` (com as env vars/`.env` resolvendo os segredos).
