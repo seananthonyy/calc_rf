@@ -14,9 +14,12 @@ Fluxos: as duas UDFs de agenda passam a mostrar **toda data de evento** (as de c
   `cpFluxoCompleto` (B3 `getBondDetails`). `Tipo`: `J` (só juros), `J+A`, `J+I` (incorporação, só
   em `IPCA-I`). O argumento `taxa` segue aceito e é **ignorado** (assinatura preservada → sem re-bake).
 - `cpFluxoCompleto`: mesma agenda, escopo **inteiro** (desde a emissão). Colunas inalteradas.
-- ⚠️ A soma dos `%Amort` cadastrados pode fechar **abaixo de 100** (FGEN13: 91,975) — a B3 não
-  cadastra o principal residual quitado no vencimento. A linha do vencimento sai com o que a B3
-  informa; nada é inferido.
+- **Principal residual do vencimento** (`apis._CompletarResiduo`): a B3 não cadastra o principal
+  quitado no vencimento dos papéis **IPCA-I** (FGEN13: os `A` somam 91,975; MESA13: 86,823). A linha
+  do vencimento recebe `100 − Σ%amort`, e a agenda passa a fechar 100%. Valor **derivado**, não
+  cadastrado — mas conferido contra o `trades.db` (fonte independente): FGEN13 8,025 e MESA13
+  13,176856 no vencimento, iguais aos derivados (delta ≤ 1e-15). Papéis cujos `A` já somam 100
+  (IPCA simples: ISAEC2, PALF38, SAVI13, ATHD11, VIALA5) não são tocados.
 
 ## v1.0.0 — 2026-07-12
 Add-in `cp*` API-only (B3 → FI → bondbuilder; DI local; BCB/SGS; IBGE SIDRA). **32 UDFs.**

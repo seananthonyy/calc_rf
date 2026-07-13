@@ -627,8 +627,22 @@ def FluxoCadastrado(ticker):
             if ipcaI and y > 0:
                 acc[1] += y
             # 'J' cupom (não-IPCA-I ou yield 0) não soma %: é juros pago, não incorporação
+    if porData:
+        _CompletarResiduo(porData, b.get("expiredate"))
     return [{"data": d, "tipo": _TipoEvento(j, a, i), "amort": a, "incorp": i}
             for d, (a, i, j) in sorted(porData.items())]
+
+
+def _CompletarResiduo(porData, vencimento):
+    """Fecha o principal na linha do VENCIMENTO quando os eventos 'A' cadastrados somam < 100%.
+
+    A B3 não cadastra o principal residual quitado no vencimento (FGEN13: os 'A' somam 91,975 e o
+    vencimento vem só com o 'J' → faltam 8,025%). Aqui o vencimento recebe 100 − Σ%amort. Valor
+    DERIVADO, não cadastrado. Se os 'A' já somam 100 (ex.: ISAEC2, bullet), nada muda."""
+    venc = vencimento if vencimento in porData else max(porData)
+    residuo = round(100.0 - sum(v[0] for v in porData.values()), 6)
+    if residuo > 0:
+        porData[venc][0] = round(porData[venc][0] + residuo, 6)
 
 
 def _TipoEvento(temJuros, amort, incorp):

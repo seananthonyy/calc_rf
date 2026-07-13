@@ -138,6 +138,11 @@ Feche e reabra o Excel:
 >
 > O argumento `taxa` do `cpFluxo` é aceito por compatibilidade e **ignorado** (a agenda não depende
 > da taxa). As colunas antigas `Prazo(DU)`·`VF`·`VP` (fluxo calculado em R$) **não existem mais**.
+>
+> **Principal do vencimento:** nos papéis `IPCA-I` a B3 não cadastra o principal residual quitado no
+> vencimento (FGEN13: os `A` somam 91,975%). A linha do vencimento é completada com `100 − Σ%amort`,
+> então a agenda **sempre fecha 100%**. É valor derivado — validado contra o `trades.db` (FGEN13
+> 8,025 e MESA13 13,176856, idênticos).
 
 ### Métricas / gross up (FI Analytics)
 | Função | Retorno |
