@@ -592,14 +592,16 @@ def BondDetailsB3(ticker):
 
 
 def FluxoCadastrado(ticker):
-    """Agenda de AMORTIZAÇÃO/INCORPORAÇÃO cadastrada (getBondDetails.events), AGREGADA por data:
-    lista ordenada [{data(iso), amort(%), incorp(%)}], ou None se não houver cadastro na B3.
+    """Agenda de eventos cadastrada (getBondDetails.events), AGREGADA por data: lista ordenada
+    [{data(iso), tipo, amort(%), incorp(%)}], ou None se não houver cadastro na B3.
 
-    - UMA linha por data: soma o que cai no mesmo dia (ex.: no vencimento há a amortização final
-      'A' E o cupom 'J' — vira uma linha só com o %amort).
+    - UMA linha por data: a B3 manda os eventos SEPARADOS, então uma data de amortização vem 2x
+      (o 'A' e o 'J' do cupom). Aqui vira uma linha só (ex.: FGEN13 15/06/2027 = 'A' 8,025 + 'J' 0).
     - TODA data da agenda entra, inclusive as de cupom puro (saem com amort=0 e incorp=0) — é a
       agenda de eventos do papel, não só de amort/incorp. Num papel bullet com cupom (ex.: ISAEC2,
       method=IPCA) as datas de cupom são justamente o que interessa.
+    - `tipo`: composto pelo que existe na data — 'J' (juros), 'J+A' (juros e amortização),
+      'J+I' (juros e incorporação).
     Regras (validação de fluxos):
       - 'A' e 'V' -> %amortização (yield).
       - 'J': só quando method == 'IPCA-I' e yield>0 é incorporação (yield=%incorp). Nos demais
@@ -617,14 +619,29 @@ def FluxoCadastrado(ticker):
             continue
         t = e.get("eventType")
         y = e.get("yield") or 0.0
-        acc = porData.setdefault(d, [0.0, 0.0])   # [amort, incorp]
+        acc = porData.setdefault(d, [0.0, 0.0, False])   # [amort, incorp, temJuros]
         if t in ("A", "V"):
             acc[0] += y
-        elif t == "J" and ipcaI and y > 0:
-            acc[1] += y
-        # 'J' cupom (não-IPCA-I ou yield 0) não soma nada
-    return [{"data": d, "amort": a, "incorp": i}
-            for d, (a, i) in sorted(porData.items())]
+        elif t == "J":
+            acc[2] = True
+            if ipcaI and y > 0:
+                acc[1] += y
+            # 'J' cupom (não-IPCA-I ou yield 0) não soma %: é juros pago, não incorporação
+    return [{"data": d, "tipo": _TipoEvento(j, a, i), "amort": a, "incorp": i}
+            for d, (a, i, j) in sorted(porData.items())]
+
+
+def _TipoEvento(temJuros, amort, incorp):
+    """Rótulo do evento a partir do que existe na data: 'J', 'J+A', 'J+I' (ou 'A'/'I' se, num papel
+    atípico, a data não tiver o evento de juros)."""
+    partes = []
+    if temJuros:
+        partes.append("J")
+    if amort > 0:
+        partes.append("A")
+    if incorp > 0:
+        partes.append("I")
+    return "+".join(partes) if partes else "J"
 
 
 def _CalcPuB3Full(ticker, dataIso, taxa):

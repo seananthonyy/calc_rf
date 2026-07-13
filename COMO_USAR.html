@@ -104,11 +104,14 @@
     <p class="sub">Estas fórmulas <b>derramam</b> uma tabela: clique numa célula vazia com espaço abaixo/à direita.</p>
     <table>
       <tr><th>Fórmula</th><th>O que faz</th><th>Exemplo</th><th>Fonte</th></tr>
-      <tr><td class="f">cpFluxoCompleto</td><td>Agenda de <b>amortização e incorporação</b>: Data · %Amort · %Incorp</td>
+      <tr><td class="f">cpFluxo</td><td>Agenda do que <b>ainda vai acontecer</b> a partir da data: Data · Tipo · %Amort · %Incorp.
+          <b>Tipo:</b> J = só juros · J+A = juros e amortização · J+I = juros e incorporação</td>
+          <td><code>=cpFluxo("FGEN13";"13/06/2025")</code></td><td class="src">B3</td></tr>
+      <tr><td class="f">cpFluxoCompleto</td><td>A agenda <b>inteira</b> do papel, desde a emissão: Data · %Amort · %Incorp</td>
           <td><code>=cpFluxoCompleto("FGEN13")</code></td><td class="src">B3</td></tr>
-      <tr><td class="f">cpFluxo</td><td>Fluxo de caixa restante calculado (data · tipo · prazo · valor futuro · valor presente)</td>
-          <td><code>=cpFluxo("FGEN13";"13/06/2025")</code></td><td class="src">B3 / FI Analytics</td></tr>
     </table>
+    <p class="sub">Uma linha por data. Data que só paga cupom sai com 0 em %Amort e 0 em %Incorp.
+      Incorporação só existe em papel IPCA-I.</p>
   </section>
 
   <section>

@@ -118,8 +118,8 @@ Feche e reabra o Excel:
 |---|---|
 | `=cpPupar(ticker; data; [taxa%])` | PU Par (valor nominal atualizado + juros) |
 | `=cpVna(ticker; data; [taxa%])` | VNA — Valor Nominal Atualizado |
-| `=cpFluxo(ticker; data; [taxa%])` | Fluxo de caixa **RESTANTE** calculado (spill): Data · Tipo · Prazo(DU) · VF · VP |
-| `=cpFluxoCompleto(ticker)` | **Agenda CADASTRADA** (spill): Data · %Amort · %Incorp (datas em dia útil) |
+| `=cpFluxo(ticker; data; [taxa%])` | Agenda **RESTANTE** a partir da data (spill): Data · Tipo · %Amort · %Incorp |
+| `=cpFluxoCompleto(ticker)` | Agenda **INTEIRA**, desde a emissão (spill): Data · %Amort · %Incorp |
 | `=cpVencimento(ticker)` | Data de vencimento |
 | `=cpEmissao(ticker)` | Data de emissão |
 | `=cpInicioRentabilidade(ticker)` | Data de início de rentabilidade |
@@ -127,9 +127,17 @@ Feche e reabra o Excel:
 | `=cpVne(ticker)` | Valor Nominal de Emissão |
 | `=cpAniversario(ticker)` | Dia de aniversário |
 
-> `cpFluxo` × `cpFluxoCompleto`: `cpFluxo` é o fluxo de caixa **restante calculado** (precisa data/taxa,
-> vem do `calcPU`); `cpFluxoCompleto` é a **agenda cadastrada** do papel (só o ticker, vem do
-> `getBondDetails`) — Amortização, Incorporação (só em papéis IPCA-I) e Cupom.
+> `cpFluxo` × `cpFluxoCompleto`: as duas vêm da **agenda cadastrada** na B3 (`getBondDetails`) e trazem
+> uma linha por data de evento — a data de amortização, que a B3 manda em 2 eventos (o `A` e o `J`),
+> é agregada numa linha só. A diferença é o **escopo**: `cpFluxo` mostra só o que **ainda vai
+> acontecer** a partir da data informada (e traz a coluna `Tipo`); `cpFluxoCompleto` mostra a agenda
+> **inteira**, desde a emissão. Datas de cupom puro saem com `%Amort`=0 e `%Incorp`=0.
+>
+> `Tipo` (só no `cpFluxo`): **J** = só juros · **J+A** = juros e amortização · **J+I** = juros e
+> incorporação (incorporação só existe em papel `IPCA-I`).
+>
+> O argumento `taxa` do `cpFluxo` é aceito por compatibilidade e **ignorado** (a agenda não depende
+> da taxa). As colunas antigas `Prazo(DU)`·`VF`·`VP` (fluxo calculado em R$) **não existem mais**.
 
 ### Métricas / gross up (FI Analytics)
 | Função | Retorno |

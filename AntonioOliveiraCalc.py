@@ -15,7 +15,7 @@ _EXCEL_EPOCH = date_type(1899, 12, 30)
 
 # Versão da lógica (.py). O .xlam é versionado por NOME de arquivo (AntonioOliveiraCalc_vN.xlam);
 # a lógica aqui é retrocompatível (só adiciona UDF, nunca remove/renomeia) — ver CHANGELOG.md.
-VERSION = "1.0.0"
+VERSION = "1.0.1"
 
 # Todas as UDFs têm o prefixo cp (ex.: =cpPu, =cpTaxa, =cpVna...).
 # Títulos com API (debênture, CRI/CRA, NTN-B…): via B3 → FI Analytics → bondbuilder.
@@ -25,7 +25,7 @@ _IMPORT_ERROR = None
 try:
     from apis import (
         Preco, TaxaOp, LimparCache, FatorDi,
-        CampoBond, CampoFi, FluxoRestante, FluxoCadastrado, BcbValor, IpcaIndice,
+        CampoBond, CampoFi, FluxoCadastrado, BcbValor, IpcaIndice,
     )
     import di
 except Exception as _e:
@@ -212,21 +212,27 @@ def cpVna(ticker, data, taxa=None):
 @xw.func
 @xw.arg('taxa', numbers=float)
 def cpFluxo(ticker, data, taxa=None):
-    """Fluxo de caixa RESTANTE na data (spill): colunas Data | Tipo | Prazo(DU) | VF | VP.
-    taxa opcional (VF/VP dependem da taxa só no VP; se omitida usa a de emissão)."""
+    """Agenda RESTANTE do papel a partir da data (spill): Data | Tipo | %Amort | %Incorp.
+    Uma linha por data de evento (a data de amortização, que a B3 manda em 2 eventos, vira uma
+    linha só). Tipo: J = só juros, J+A = juros e amortização, J+I = juros e incorporação
+    (incorporação só em papel IPCA-I). Datas ajustadas p/ dia útil (feriados ANBIMA).
+    `taxa` é aceita por compatibilidade e ignorada (a agenda não depende dela).
+    (=cpFluxoCompleto traz a agenda INTEIRA, desde a emissão.)"""
     if _IMPORT_ERROR:
         return [[f"ERRO import: {_IMPORT_ERROR}"]]
     try:
-        ticker = str(ticker).upper().strip()
-        fl = FluxoRestante(ticker, _data_iso(data), _resolve_taxa(ticker, taxa))
-        if not fl:
-            return [["ERRO: fluxo indisponível (B3/FI)"]]
-        linhas = [["Data", "Tipo", "Prazo(DU)", "VF", "VP"]]
-        for e in fl:
-            linhas.append([
-                _data_saida(e.get("data")), e.get("tipo"), e.get("prazo"),
-                e.get("vf"), e.get("vp"),
-            ])
+        ag = FluxoCadastrado(str(ticker).upper().strip())
+        if not ag:
+            return [["ERRO: agenda indisponível (B3 getBondDetails)"]]
+        corte = _data_iso(data)
+        linhas = [["Data", "Tipo", "%Amort", "%Incorp"]]
+        for e in ag:
+            iso = _ajusta_du_iso(e["data"])
+            if iso < corte:
+                continue
+            linhas.append([_data_saida(iso), e["tipo"], e["amort"], e["incorp"]])
+        if len(linhas) == 1:
+            return [["ERRO: nenhum evento restante (papel vencido?)"]]
         return linhas
     except Exception as e:
         return [[f"ERRO: {e}"]]

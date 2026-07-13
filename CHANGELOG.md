@@ -4,6 +4,20 @@ Versionamento: a **lógica** (`.py`) é retrocompatível; o **`.xlam` é version
 (`AntonioOliveiraCalc_vN.xlam`) — versões antigas ficam na share e não quebram quem já usa.
 `VERSION` no `AntonioOliveiraCalc.py` acompanha a lógica.
 
+## v1.0.1 — 2026-07-13
+Fluxos: as duas UDFs de agenda passam a mostrar **toda data de evento** (as de cupom puro saem com
+`%Amort`=0 e `%Incorp`=0). Antes elas eram filtradas, e num papel bullet com cupom (ISAEC2:
+`method=IPCA`, 30 eventos `J` + 1 `A`) sobrava só o vencimento.
+
+- `cpFluxo` muda de **formato**: era `Data·Tipo·Prazo(DU)·VF·VP` (fluxo em R$ calculado via FI/B3),
+  agora é `Data·Tipo·%Amort·%Incorp` — a **agenda restante** a partir da data, da mesma fonte do
+  `cpFluxoCompleto` (B3 `getBondDetails`). `Tipo`: `J` (só juros), `J+A`, `J+I` (incorporação, só
+  em `IPCA-I`). O argumento `taxa` segue aceito e é **ignorado** (assinatura preservada → sem re-bake).
+- `cpFluxoCompleto`: mesma agenda, escopo **inteiro** (desde a emissão). Colunas inalteradas.
+- ⚠️ A soma dos `%Amort` cadastrados pode fechar **abaixo de 100** (FGEN13: 91,975) — a B3 não
+  cadastra o principal residual quitado no vencimento. A linha do vencimento sai com o que a B3
+  informa; nada é inferido.
+
 ## v1.0.0 — 2026-07-12
 Add-in `cp*` API-only (B3 → FI → bondbuilder; DI local; BCB/SGS; IBGE SIDRA). **32 UDFs.**
 
