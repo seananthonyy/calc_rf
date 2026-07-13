@@ -5,6 +5,14 @@ Versionamento: a **lógica** (`.py`) é retrocompatível; o **`.xlam` é version
 `VERSION` no `AntonioOliveiraCalc.py` acompanha a lógica.
 
 ## v1.0.1 — 2026-07-13
+
+**Bundle (auto-extrator):** volta a ser **versionado no repo** (estava no `.gitignore` como
+"derivado" — mas é o único jeito de instalar no banco, que não tem `git pull`). E agora ele **pula
+arquivo já idêntico** em vez de reescrever tudo: como o `.xlam` só muda quando há UDF/assinatura
+nova, atualizar a lógica (`.py`) **não exige mais fechar o Excel** — o `.xlam` travado é pulado por
+ser igual. Se um arquivo mudou E está travado, o extrator diz qual e sai com erro (antes: estourava
+`PermissionError` no `.xlam`, que é o 1º da lista, e não escrevia nenhum `.py`).
+
 Fluxos: as duas UDFs de agenda passam a mostrar **toda data de evento** (as de cupom puro saem com
 `%Amort`=0 e `%Incorp`=0). Antes elas eram filtradas, e num papel bullet com cupom (ISAEC2:
 `method=IPCA`, 30 eventos `J` + 1 `A`) sobrava só o vencimento.

@@ -63,14 +63,40 @@ FILES = {{
 
 RODAPE = '''}
 
+def _igual(caminho, conteudo):
+    """O arquivo que já está lá é idêntico ao do bundle?"""
+    try:
+        with open(caminho, "rb") as f:
+            return f.read() == conteudo
+    except OSError:
+        return False
+
+
 def main():
     os.makedirs(DEST, exist_ok=True)
+    escritos, pulados, travados = 0, 0, []
     for nome, b64 in FILES.items():
         caminho = os.path.join(DEST, nome)
-        with open(caminho, "wb") as f:
-            f.write(base64.b64decode(b64))
-        print("escrito:", caminho)
-    print(f"\\nOK — {len(FILES)} arquivos em {DEST}")
+        conteudo = base64.b64decode(b64)
+        # Arquivo idêntico não é reescrito: é o que permite atualizar os .py com o pessoal
+        # usando o Excel (o .xlam fica travado pelo Excel, mas não mudou -> pula).
+        if _igual(caminho, conteudo):
+            print("igual (pulado):", nome)
+            pulados += 1
+            continue
+        try:
+            with open(caminho, "wb") as f:
+                f.write(conteudo)
+            print("escrito:", caminho)
+            escritos += 1
+        except PermissionError:
+            travados.append(nome)
+
+    print(f"\\nOK — {escritos} escrito(s), {pulados} já igual(is), em {DEST}")
+    if travados:
+        print("\\n*** NAO FOI POSSIVEL ESCREVER (arquivo em uso): " + ", ".join(travados))
+        print("*** Esses arquivos MUDARAM e estao travados — feche o Excel e rode de novo.")
+        sys.exit(1)
     print("Lembre: essa pasta precisa ser Z:\\\\AntonioOliveira\\\\AntonioOliveiraCalc "
           "(ou re-bake o .xlam com o path certo).")
 

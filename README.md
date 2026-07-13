@@ -44,6 +44,12 @@ Garanta que `Z:\AntonioOliveira\AntonioOliveiraCalc` existe com os arquivos acim
 estar acessível quando o Excel abre. (Alternativa rápida: jogue só o `AntonioOliveiraCalc_bundle.py`
 na pasta e rode `python AntonioOliveiraCalc_bundle.py` — ele extrai tudo.)
 
+> **Atualizar depois** = baixar o bundle novo na share e rodar de novo. Ele **pula todo arquivo que
+> já está idêntico**, então o `.xlam` — que só muda quando há UDF/assinatura nova — não é reescrito e
+> **não precisa que ninguém feche o Excel**: dá pra atualizar a lógica (`.py`) com o time usando a
+> planilha. Se algum arquivo tiver MESMO mudado e estiver travado pelo Excel, ele avisa qual e sai
+> com erro (aí sim, fechar o Excel e repetir).
+
 ### 2. Variáveis de ambiente do usuário (segredos + proxy)
 No banco não há `.env`; os segredos entram por variável de ambiente **do usuário**:
 
@@ -189,7 +195,7 @@ renomeia** (senão quebra planilhas e `.xlam` antigos). O **`.xlam` é versionad
 
 | Mudou | O que fazer | Efeito nos usuários |
 |---|---|---|
-| **Lógica** (`apis.py`, `AntonioOliveiraCalc.py`, `di.py`) | colar o `.py` novo na share (`git pull`) | reabrir o Excel — **nada quebra** |
+| **Lógica** (`apis.py`, `AntonioOliveiraCalc.py`, `di.py`) | colar o `.py` novo na share (`git pull`, ou rodar o bundle) | reabrir o Excel — **nada quebra** |
 | **Nova UDF / assinatura** (precisa re-bake) | gerar `AntonioOliveiraCalc_v{N+1}.xlam` (arquivo **novo**), atualizar `VERSION` no `.py`, rodar `python gerar_bundle.py`, registrar `CHANGELOG.md` | quem quiser o novo registra o `_vN+1`; **o `_vN` antigo fica na share e continua funcionando** |
 
 > Por isso os `.xlam` **nunca são apagados/sobrescritos**: cada versão é um arquivo novo
