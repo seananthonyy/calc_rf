@@ -4,6 +4,19 @@ Versionamento: a **lógica** (`.py`) é retrocompatível; o **`.xlam` é version
 (`AntonioOliveiraCalc_vN.xlam`) — versões antigas ficam na share e não quebram quem já usa.
 `VERSION` no `AntonioOliveiraCalc.py` acompanha a lógica.
 
+## v1.0.2 — 2026-07-13
+**`cpGrossUp`, `cpGrossUpTipo` e `cpDv01` passam a funcionar em papel do bondbuilder** (LCD, LF,
+CDB… — os que não existem no `/deb` nem no `/cr`). As três usam `CampoFi` → `_FiFull`, que só
+tentava `/deb` e `/cr`; agora cai no **bondbuilder** como 3ª fonte (novo `apis._BbFull`), a mesma
+cadeia que o `Preco`/`TaxaOp` já fazia — por isso `cpPu`/`cpTaxa`/`cpDur` funcionavam nesses papéis
+e o gross up não. O `/bb` devolve os mesmos campos (`taxedM2MRate`, `taxedType`, `dv01`).
+Validado no `LCD BNDES 10 ANOS`: gross up 0,150595 · dv01 −0,420325 · tipo `GROSS_UP`. Sem regressão
+em debênture (FGEN13 inalterado).
+
+> ⚠️ Papel do bondbuilder **não tem cadastro na B3**, então as UDFs que dependem do `getBondDetails`
+> (`cpVencimento`, `cpTaxaEmissao`, `cpFluxo`, `cpFluxoCompleto`…) seguem indisponíveis nele — e a
+> taxa vira **obrigatória** no `cpGrossUpTipo` (não há taxa de emissão pra herdar).
+
 ## v1.0.1 — 2026-07-13
 
 **Bundle (auto-extrator):** volta a ser **versionado no repo** (estava no `.gitignore` como

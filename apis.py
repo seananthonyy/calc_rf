@@ -673,16 +673,31 @@ def _CalcPuB3Full(ticker, dataIso, taxa):
 
 
 def _FiFull(ticker, dataIso, taxa):
-    """Resposta COMPLETA da FI (modo rate), via /deb ou /cr, ou None."""
+    """Resposta COMPLETA da FI (modo rate), via /deb, /cr ou bondbuilder, ou None.
+
+    Mesma cadeia de fontes do `Preco`/`TaxaOp`: papel que só existe no bondbuilder (LCD, LF, CDB...)
+    não é conhecido pelo /deb nem pelo /cr, mas o /bb devolve os MESMOS campos (m2m, taxedM2MRate,
+    taxedType, dv01...) — é o que faz cpGrossUp/cpGrossUpTipo/cpDv01 funcionarem nesses papéis."""
     taxa = _Norm(taxa)
     chave = ("fifull", str(ticker).upper().strip(), dataIso, taxa)
     c = _CacheGet(chave)
     if c is not _CACHE_AUSENTE:
         return c
     dados = _PostFiAuto({"ticker": ticker, "date": dataIso, "rate": float(taxa)})
+    if not (isinstance(dados, dict) and dados.get("m2m") is not None):
+        dados = _BbFull(ticker, dataIso, taxa)
     res = dados if isinstance(dados, dict) and dados.get("m2m") is not None else None
     _CacheSet(chave, res)
     return res
+
+
+def _BbFull(ticker, dataIso, taxa):
+    """Resposta COMPLETA do bondbuilder (modo rate) ou None."""
+    docId = _AcharDocId(ticker)
+    if not docId:
+        return None
+    dados = _PostFiRaw(FI_BB_PATH, {"doc_id": docId, "date": dataIso, "rate": float(taxa)})
+    return dados if _BbOk(dados) else None
 
 
 def _FluxoFi(f):
