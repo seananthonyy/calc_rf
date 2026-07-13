@@ -244,8 +244,9 @@ def _ajusta_du_iso(iso):
 @xw.func
 def cpFluxoCompleto(ticker):
     """Agenda CADASTRADA do papel (B3 getBondDetails, spill): Data | %Amort | %Incorp.
-    Datas ajustadas p/ dia útil (feriados ANBIMA). Incorporação só aparece em papéis IPCA-I;
-    linhas de cupom puro saem com 0/0. (=cpFluxo é o fluxo de caixa RESTANTE calculado.)"""
+    UMA linha por data de evento, da emissão ao vencimento — datas de cupom puro entram com
+    0 em %Amort e 0 em %Incorp. Datas ajustadas p/ dia útil (feriados ANBIMA). Incorporação só
+    aparece em papéis IPCA-I. (=cpFluxo é o fluxo de caixa RESTANTE calculado.)"""
     if _IMPORT_ERROR:
         return [[f"ERRO import: {_IMPORT_ERROR}"]]
     try:

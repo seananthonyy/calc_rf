@@ -597,7 +597,9 @@ def FluxoCadastrado(ticker):
 
     - UMA linha por data: soma o que cai no mesmo dia (ex.: no vencimento há a amortização final
       'A' E o cupom 'J' — vira uma linha só com o %amort).
-    - Linhas puras de cupom (sem amort nem incorp) são OMITIDAS — é uma agenda de amort/incorp.
+    - TODA data da agenda entra, inclusive as de cupom puro (saem com amort=0 e incorp=0) — é a
+      agenda de eventos do papel, não só de amort/incorp. Num papel bullet com cupom (ex.: ISAEC2,
+      method=IPCA) as datas de cupom são justamente o que interessa.
     Regras (validação de fluxos):
       - 'A' e 'V' -> %amortização (yield).
       - 'J': só quando method == 'IPCA-I' e yield>0 é incorporação (yield=%incorp). Nos demais
@@ -622,8 +624,7 @@ def FluxoCadastrado(ticker):
             acc[1] += y
         # 'J' cupom (não-IPCA-I ou yield 0) não soma nada
     return [{"data": d, "amort": a, "incorp": i}
-            for d, (a, i) in sorted(porData.items())
-            if a > 0 or i > 0]
+            for d, (a, i) in sorted(porData.items())]
 
 
 def _CalcPuB3Full(ticker, dataIso, taxa):
