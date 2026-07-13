@@ -16,7 +16,10 @@ AQUI = os.path.dirname(os.path.abspath(__file__))
 def _versao():
     txt = open(os.path.join(AQUI, "AntonioOliveiraCalc.py"), encoding="utf-8").read()
     m = re.search(r'VERSION\s*=\s*"([^"]+)"', txt)
-    return m.group(1) if m else "0.0.0"
+    if not m:
+        raise SystemExit("VERSION nao encontrada em AntonioOliveiraCalc.py — "
+                         "a copia nesta pasta e antiga (anterior a v1.0.0).")
+    return m.group(1)
 
 
 VERSION = _versao()
