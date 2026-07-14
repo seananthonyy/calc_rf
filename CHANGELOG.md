@@ -5,6 +5,12 @@ Versionamento: a **lógica** (`.py`) é retrocompatível; o **`.xlam` é version
 `VERSION` no `CalcCP.py` acompanha a lógica.
 
 ## v1.1.0 — 2026-07-13 — renomeado para **CalcCP** + nova pasta na share
+> ✅ **Em produção no banco desde 14/07/2026** (instalado em `Z:\CP\CalcCP` via bundle, add-in
+> re-registrado, confirmado funcionando pelo usuário).
+> 📄 Doc (14/07, sem mudança de lógica → sem bump de `VERSION`): README ganhou as 5 fórmulas de
+> indicadores que faltavam na tabela (`cpSelic`, `cpCdiAno`, `cpIpca`, `cpIpca15`, `cpIgpm` — existiam
+> no código desde a v1.0.0, mas não estavam documentadas) e deixou de mandar dar `git pull` pra
+> atualizar (no banco não existe `git pull`; o caminho é o bundle).
 
 **O add-in deixa de se chamar `AntonioOliveiraCalc` e passa a ser `CalcCP`** (nome pessoal num
 utilitário usado pelo time todo). **As fórmulas NÃO mudam** — seguem todas com prefixo `cp`

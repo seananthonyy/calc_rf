@@ -163,13 +163,21 @@ Feche e reabra o Excel:
 **Data obrigatória** — retorna o último valor publicado **até** a data (cobre
 fim de semana/feriado e séries mensais). Ex.: `=cpSelic("31/12/2020")` → 2,0.
 
-| Função | Retorno |
-|---|---|
-| `=cpIpcaIndice([data])` | IPCA **número-índice** (base dez/1993=100, IBGE SIDRA) |
-| `=cpDolar([data])` / `=cpEuro([data])` | Câmbio PTAX venda (R$) |
+**Taxas saem em DECIMAL** (6% → 0,06) — formate a célula como % se quiser ver "6%".
+
+| Função | Retorno | Fonte |
+|---|---|---|
+| `=cpSelic(data)` | Meta SELIC a.a., **decimal** | BCB série 432 |
+| `=cpCdiAno(data)` | CDI anualizado base 252, **decimal** | BCB série 4389 |
+| `=cpIpca(data)` | IPCA **do mês**, decimal (0,93% → 0,0093) | BCB série 433 |
+| `=cpIpca15(data)` | IPCA-15 do mês, decimal | BCB série 7478 |
+| `=cpIgpm(data)` | IGP-M do mês, decimal | BCB série 189 |
+| `=cpIpcaIndice([data])` | IPCA **número-índice** (base dez/1993 = 100) — valor natural, não é taxa | IBGE SIDRA |
+| `=cpDolar([data])` / `=cpEuro([data])` | Câmbio PTAX venda (R$) — valor natural | BCB |
 
 > **Correção IPCA entre datas** = `=cpIpcaIndice(dataFim)/cpIpcaIndice(dataIni)` — mesmo fator que
-> atualiza o VNA de uma NTN-B/papel IPCA+.
+> atualiza o VNA de uma NTN-B/papel IPCA+. Use o **número-índice** pra isso, não o `cpIpca` (que é a
+> variação de um mês só).
 
 ### Dias úteis (feriados ANBIMA)
 | Função | Retorno |
@@ -197,7 +205,7 @@ renomeia** (senão quebra planilhas e `.xlam` antigos). O **`.xlam` é versionad
 
 | Mudou | O que fazer | Efeito nos usuários |
 |---|---|---|
-| **Lógica** (`apis.py`, `CalcCP.py`, `di.py`) | colar o `.py` novo na share (`git pull`, ou rodar o bundle) | reabrir o Excel — **nada quebra** |
+| **Lógica** (`apis.py`, `CalcCP.py`, `di.py`) | **no banco não há `git pull`** → baixar o `CalcCP_bundle.py` do GitHub na share e rodar (`python CalcCP_bundle.py`) | reabrir o Excel — **nada quebra**, nem precisa fechar (o `.xlam` idêntico é pulado) |
 | **Nova UDF / assinatura** (precisa re-bake) | gerar `CalcCP_v{N+1}.xlam` (arquivo **novo**), atualizar `VERSION` no `.py`, rodar `python gerar_bundle.py`, registrar `CHANGELOG.md` | quem quiser o novo registra o `_vN+1`; **o `_vN` antigo fica na share e continua funcionando** |
 
 > Por isso os `.xlam` **nunca são apagados/sobrescritos**: cada versão é um arquivo novo
