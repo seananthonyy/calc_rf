@@ -7,17 +7,19 @@ Versionamento: a **lógica** (`.py`) é retrocompatível; o **`.xlam` é version
 ## v1.2.0 — 2026-07-22 — pasta configurável por variável de ambiente (`CALCCP_DIR`)
 
 **O caminho da pasta deixa de ser fixo no `.xlam`.** O `PYTHONPATH` embutido passou de
-`Z:\CP\CalcCP` para **`%CALCCP_DIR%;Z:\CP\CalcCP`**: o add-in lê a pasta da variável de ambiente
-**`CALCCP_DIR`** (de usuário, sem admin) e cada PC pode apontar para onde a pasta estiver de fato —
-share com letra de drive diferente, cópia local etc.
+`Z:\CP\CalcCP` (que apontava para uma subpasta inexistente — os arquivos ficam direto em `Z:\CP`)
+para **`%CALCCP_DIR%;Z:\CP`**: o add-in lê a pasta da variável de ambiente **`CALCCP_DIR`** (de
+usuário, sem admin) e cada PC pode apontar para onde a pasta estiver de fato — share com letra de
+drive diferente, cópia local etc.
 
-- **Não quebra quem já usa:** quem não setar `CALCCP_DIR` cai no fallback `Z:\CP\CalcCP` — o mesmo
-  comportamento da v1.1. A mudança é retrocompatível.
+- **Corrige o path e não quebra:** quem não setar `CALCCP_DIR` cai no fallback `Z:\CP`, que é onde os
+  arquivos (`CalcCP.py`, `.xlam`…) realmente estão na share. A mudança é retrocompatível e ainda
+  conserta o fallback (o `Z:\CP\CalcCP` baked na v1.1 não existia).
 - **Config manual no banco:** `setx CALCCP_DIR "<pasta>"` (uma linha, por usuário) → reiniciar o Excel.
 - **Diagnóstico:** `=cpTeste()` e o botão **Sobre** passam a mostrar se a `CALCCP_DIR` foi lida ou se
   está no fallback.
-- **Repo público:** o `.xlam` só carrega `%CALCCP_DIR%` e a letra de drive `Z:\CP\CalcCP` (nenhum
-  nome de servidor). O caminho real fica só na env var de cada máquina.
+- **Repo público:** o `.xlam` só carrega `%CALCCP_DIR%` e a letra de drive `Z:\CP` (nenhum nome de
+  servidor). O caminho real fica só na env var de cada máquina.
 - **Como foi feito:** editado o `sharedStrings.xml` do `.xlam` direto no zip (sem abrir no Excel), então
   o `vbaProject.bin` ficou byte-a-byte idêntico — sem re-registro e sem PII nova. Mesmo nome de
   arquivo (`CalcCP_v1.xlam`), só a lógica subiu para `VERSION = "1.2.0"`.

@@ -31,7 +31,7 @@ Datas aceitam `"dd/mm/aaaa"`, célula de data ou `HOJE()`.
    ```
    Esperado: `0.36.6` e a lista com `xlwings64-0.36.6.dll`. Se não, ver [erro de DLL](#erro-file-not-found-xlwings64-0366dll).
 3. **A pasta do add-in acessível pelo PC.** A partir da v1.2 o caminho **não é mais fixo**: o
-   `.xlam` lê a pasta da variável de ambiente **`CALCCP_DIR`** (com fallback para `Z:\CP\CalcCP`,
+   `.xlam` lê a pasta da variável de ambiente **`CALCCP_DIR`** (com fallback para `Z:\CP`,
    se a variável não estiver setada — ver [passo 2](#2-variáveis-de-ambiente-do-usuário-segredos--proxy--pasta)).
    Assim cada PC pode apontar para onde a pasta estiver (share com letra diferente, cópia local etc.).
    Conteúdo mínimo da pasta: `CalcCP_v1.xlam`, `CalcCP.py`, `apis.py`, `di.py`, `config.py`,
@@ -43,7 +43,7 @@ Datas aceitam `"dd/mm/aaaa"`, célula de data ou `HOJE()`.
 
 ### 1. Colocar a pasta na share
 Coloque os arquivos numa pasta acessível quando o Excel abre — pode ser a share do time
-(`Z:\CP\CalcCP` é o default de fallback) **ou qualquer outro caminho**, desde que você aponte a
+(`Z:\CP` é o default de fallback) **ou qualquer outro caminho**, desde que você aponte a
 variável `CALCCP_DIR` para ele (passo 2). (Alternativa rápida: jogue só o `CalcCP_bundle.py`
 na pasta e rode `python CalcCP_bundle.py` — ele extrai tudo.)
 
@@ -59,7 +59,7 @@ usuário** (nenhuma precisa de admin/sistema):
 
 | Variável | Conteúdo |
 |---|---|
-| `CALCCP_DIR` | **pasta onde estão os arquivos do add-in** neste PC. Se não setar, o `.xlam` cai no fallback `Z:\CP\CalcCP`. |
+| `CALCCP_DIR` | **pasta onde estão os arquivos do add-in** neste PC (ex.: `Z:\CP`). Se não setar, o `.xlam` cai no fallback `Z:\CP`. |
 | `token_calc_b3` | token do B3 Calculator |
 | `token_fianalytics` | API key do FI Analytics |
 | `user_fianalytics` | e-mail do usuário FI (só p/ o fallback bondbuilder; opcional) |
@@ -81,7 +81,7 @@ Excel → Opções → **Central de Confiabilidade** → Configurações de Macr
 
 ### 4. Habilitar o add-in
 Excel → Opções → **Suplementos** → "Suplementos do Excel" → **Ir...** → **Procurar** →
-selecionar `Z:\CP\CalcCP\CalcCP_v1.xlam` → OK.
+selecionar `Z:\CP\CalcCP_v1.xlam` → OK.
 As UDFs já vêm **registradas** no `.xlam` (não precisa "Import Functions"). Aparece a aba
 **CalcCP** no ribbon, com o botão **Sobre** — que mostra a versão da lógica, a pasta de onde o
 add-in está lendo, o Python em uso e o estado do import. Como ele roda o Python de verdade
@@ -113,7 +113,8 @@ Feche e reabra o Excel:
 ```
 
 ### Checklist (por PC)
-- [ ] Pasta em `Z:\CP\CalcCP` atualizada
+- [ ] Pasta com os arquivos (ex.: `Z:\CP`) atualizada
+- [ ] `CALCCP_DIR` setada apontando pra essa pasta (ou usar o fallback `Z:\CP`)
 - [ ] Python 64-bit com xlwings **0.36.6** + DLL na raiz
 - [ ] `token_calc_b3`, `token_fianalytics`, `proxy_http`, `proxy_https` setados
 - [ ] "Confiar no acesso ao modelo de objeto de projeto do VBA" ligado
