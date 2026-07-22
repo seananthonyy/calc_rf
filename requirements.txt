@@ -1,0 +1,12 @@
+# CalcCP — dependencias Python
+# Instalar com:  pip install -r requirements.txt
+#
+# Todo o resto usado pelo add-in e' stdlib (urllib, json, csv, datetime,
+# pathlib, math, base64, etc.) — nao precisa instalar nada alem disto.
+
+# Ponte Python <-> Excel (UDFs cp*). Puxa pywin32 no Windows.
+xlwings==0.36.6
+
+# COM do Windows — dependencia do xlwings; explicito aqui porque e' a lib
+# cuja ausencia/desregistro causava o erro "Object Required" no Excel.
+pywin32==311
