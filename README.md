@@ -24,13 +24,19 @@ Datas aceitam `"dd/mm/aaaa"`, célula de data ou `HOJE()`.
 ## Pré-requisitos do PC
 
 1. **Excel 64-bit** (Arquivo → Conta → Sobre o Excel).
-2. **Python 64-bit** com **xlwings exatamente 0.36.6** e a DLL `xlwings64-0.36.6.dll` na raiz do
-   Python (ao lado do `pythonw.exe`). Instalação padrão do python.org já põe a DLL na raiz. Verificar:
+2. **Python 64-bit** com as libs do `requirements.txt` — só **`xlwings==0.36.6`** e **`pywin32==311`**
+   (todo o resto é stdlib; o add-in faz HTTP por `urllib`). Instalar:
+   ```
+   pip install -r requirements.txt
+   ```
+   O `xlwings` tem que ser **exatamente 0.36.6**: o `.xlam` carrega a DLL `xlwings64-0.36.6.dll` pelo
+   nome com a versão carimbada. A instalação padrão do python.org já põe a DLL na raiz do Python (ao
+   lado do `pythonw.exe`). Verificar:
    ```
    python -c "import xlwings,os,sys,glob; r=os.path.dirname(sys.executable); print(xlwings.__version__); print(glob.glob(os.path.join(r,'xlwings*.dll')))"
    ```
    Esperado: `0.36.6` e a lista com `xlwings64-0.36.6.dll`. Se não, ver [erro de DLL](#erro-file-not-found-xlwings64-0366dll).
-3. **A pasta do add-in acessível pelo PC.** A partir da v1.2 o caminho **não é mais fixo**: o
+3. **A pasta do add-in acessível pelo PC.** A partir do `CalcCP_v2.xlam` o caminho **não é mais fixo**: o
    `.xlam` lê a pasta da variável de ambiente **`CALCCP_DIR`** (com fallback para `Z:\CP`,
    se a variável não estiver setada — ver [passo 2](#2-variáveis-de-ambiente-do-usuário-segredos--proxy--pasta)).
    Assim cada PC pode apontar para onde a pasta estiver (share com letra diferente, cópia local etc.).

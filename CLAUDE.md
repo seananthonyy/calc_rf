@@ -4,6 +4,29 @@
 
 Documentação técnica para o Claude Code. Leia antes de alterar qualquer coisa nesta pasta.
 
+> ## 🟢 ATUALIZAÇÃO 22/07/2026 — v2.0.0: `CalcCP_v2.xlam` + pasta por `CALCCP_DIR` (✅ CONFIRMADO FUNCIONANDO)
+> **O caminho da pasta deixou de ser fixo no `.xlam`.** Antes o `PYTHONPATH` baked era `Z:\CP\CalcCP`
+> (que apontava pra subpasta inexistente — os arquivos ficam **direto em `Z:\CP`**). Agora é
+> **`%CALCCP_DIR%;Z:\CP`**: o xlwings expande a env var (`utils.py`: `os.path.normcase(os.path.
+> expandvars(args)).split(";")` → aceita múltiplos paths por `;` e expande `%VAR%`). Cada PC seta
+> `CALCCP_DIR` (variável de **usuário**, sem admin); quem não setar cai no fallback `Z:\CP`.
+>
+> - **Arquivo NOVO `CalcCP_v2.xlam`; o `CalcCP_v1.xlam` NÃO foi tocado** (várias pessoas usam o v1 e
+>   ele fica travado com Excel aberto → não dá pra sobrescrever). Modelo de versão por arquivo: v2
+>   entra do lado, migração = re-registrar o `.xlam` (desmarca v1, procura v2). `vbaProject.bin` do v2
+>   é **byte-a-byte idêntico** ao do v1 (mesmas 32 UDFs `cp*`) — só a config de path difere.
+> - **`VERSION` do `.py` → `2.0.0`** (o `gerar_bundle.py` deriva o nome do `.xlam` do major →
+>   `CalcCP_v2.xlam`; o bundle passa a cuspir o v2). Diagnóstico `=cpTeste()`/**Sobre** mostram se a
+>   `CALCCP_DIR` foi lida ou se está no fallback.
+> - **TÉCNICA (config sem re-bake, sem PII):** pra mudar SÓ o `PYTHONPATH` não precisa abrir o Excel —
+>   editar `xl/sharedStrings.xml` direto no zip do `.xlam` (via `zipfile`, reescrevendo os membros e
+>   deixando o `vbaProject.bin` intacto). Foi assim que o v2 saiu do v1. Só quando muda a **superfície
+>   de UDF** é que precisa do re-bake COM (abaixo).
+> - **Deps:** `requirements.txt` no repo = `xlwings==0.36.6` + `pywin32==311` (resto é stdlib; HTTP por
+>   `urllib`). A varredura de imports confirmou zero outras libs de terceiros.
+> - Commits: `69b0aba`→`1c0f581` (tentativa in-place no v1, **revertida**) → **`00a48ee`** (v2 como
+>   arquivo novo, v1 restaurado). `requirements.txt` em `614c94c`.
+
 > ## ⭐ ATUALIZAÇÃO 11/07/2026 — prefixo `cp` + muitas funções novas
 > **TODAS as UDFs agora têm o prefixo `cp`** (`=cpPu`, `=cpTaxa`, `=cpDur`, `=cpCdi`). Adicionadas:
 > - **Dados do papel:** `cpPupar`, `cpVna`, `cpFluxo` (spill), `cpVencimento`, `cpEmissao`,
@@ -178,9 +201,11 @@ Só o `xl/vbaProject.bin` muda.
 ## Planilha do SharePoint/OneDrive CONGELA o Excel ao usar uma UDF
 
 > ✅ **JÁ APLICADO neste `.xlam`** (30/06): o sheet `myaddin.conf` embutido tem
-> `ADD_WORKBOOK_TO_PYTHONPATH=false` e `PYTHONPATH=Z:\CP\CalcCP`. Funciona com o
-> add-in carregado **desse caminho fixo**. Se a pasta mudar, edite o valor de `PYTHONPATH` no
-> sheet `myaddin.conf` (ou via o script `scratchpad/bake_config.py`). Abaixo, a explicação/teoria.
+> `ADD_WORKBOOK_TO_PYTHONPATH=false` e `PYTHONPATH=...`. A partir do **v2 (22/07)** o valor é
+> **`%CALCCP_DIR%;Z:\CP`** (env var + fallback; ver banner no topo) — no `CalcCP_v1.xlam` era o fixo
+> `Z:\CP\CalcCP`. Pra mudar o `PYTHONPATH`, edite o valor no sheet `myaddin.conf` direto no zip do
+> `.xlam` (`xl/sharedStrings.xml`, sem abrir o Excel → sem PII) ou via `scratchpad/bake_config.py`.
+> Abaixo, a explicação/teoria.
 
 **Sintoma:** numa planilha aberta do SharePoint/OneDrive (cujo `Workbook.FullName` é uma URL
 `https://...`), qualquer fórmula do add-in trava o Excel. Em planilha local, funciona normal.
