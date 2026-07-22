@@ -34,7 +34,7 @@ Datas aceitam `"dd/mm/aaaa"`, célula de data ou `HOJE()`.
    `.xlam` lê a pasta da variável de ambiente **`CALCCP_DIR`** (com fallback para `Z:\CP`,
    se a variável não estiver setada — ver [passo 2](#2-variáveis-de-ambiente-do-usuário-segredos--proxy--pasta)).
    Assim cada PC pode apontar para onde a pasta estiver (share com letra diferente, cópia local etc.).
-   Conteúdo mínimo da pasta: `CalcCP_v1.xlam`, `CalcCP.py`, `apis.py`, `di.py`, `config.py`,
+   Conteúdo mínimo da pasta: `CalcCP_v2.xlam`, `CalcCP.py`, `apis.py`, `di.py`, `config.py`,
    `feriados_anbima.csv`. Puxar do repositório do projeto (ou extrair o `CalcCP_bundle.py`).
 
 ---
@@ -81,7 +81,8 @@ Excel → Opções → **Central de Confiabilidade** → Configurações de Macr
 
 ### 4. Habilitar o add-in
 Excel → Opções → **Suplementos** → "Suplementos do Excel" → **Ir...** → **Procurar** →
-selecionar `Z:\CP\CalcCP_v1.xlam` → OK.
+selecionar `Z:\CP\CalcCP_v2.xlam` → OK. (Quem já usa o `CalcCP_v1.xlam` continua funcionando; migrar
+= desmarcar o v1 e procurar o v2. O `v1.xlam` **não é tocado** — fica na pasta do lado do v2.)
 As UDFs já vêm **registradas** no `.xlam` (não precisa "Import Functions"). Aparece a aba
 **CalcCP** no ribbon, com o botão **Sobre** — que mostra a versão da lógica, a pasta de onde o
 add-in está lendo, o Python em uso e o estado do import. Como ele roda o Python de verdade
@@ -107,7 +108,7 @@ Esse arquivo é **por PC e por usuário** (não vai pro repositório).
 ### 6. Testar
 Feche e reabra o Excel:
 ```
-=cpTeste()                              -> OK v1.2.0 — path: Z:\CP — CALCCP_DIR=Z:\CP
+=cpTeste()                              -> OK v2.0.0 — path: Z:\CP — CALCCP_DIR=Z:\CP
 =cpPu("FGEN13"; "13/06/2025"; 6,4686%)  -> ~961,70
 =cpPu("DI1F27"; "01/07/2026"; 10%)      -> ~95310,20   (DI, cálculo local)
 ```

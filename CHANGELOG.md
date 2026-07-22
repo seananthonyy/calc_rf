@@ -4,25 +4,28 @@ Versionamento: a **lógica** (`.py`) é retrocompatível; o **`.xlam` é version
 (`CalcCP_vN.xlam`) — versões antigas ficam na share e não quebram quem já usa.
 `VERSION` no `CalcCP.py` acompanha a lógica.
 
-## v1.2.0 — 2026-07-22 — pasta configurável por variável de ambiente (`CALCCP_DIR`)
+## v2.0.0 — 2026-07-22 — `CalcCP_v2.xlam`: pasta configurável por variável de ambiente (`CALCCP_DIR`)
 
-**O caminho da pasta deixa de ser fixo no `.xlam`.** O `PYTHONPATH` embutido passou de
-`Z:\CP\CalcCP` (que apontava para uma subpasta inexistente — os arquivos ficam direto em `Z:\CP`)
-para **`%CALCCP_DIR%;Z:\CP`**: o add-in lê a pasta da variável de ambiente **`CALCCP_DIR`** (de
-usuário, sem admin) e cada PC pode apontar para onde a pasta estiver de fato — share com letra de
-drive diferente, cópia local etc.
+**Arquivo NOVO `CalcCP_v2.xlam` (o `CalcCP_v1.xlam` fica intocado na pasta).** Como há várias
+pessoas usando o v1, não dá pra sobrescrevê-lo (fica travado com o Excel aberto) — então o v2 entra
+**do lado**, no modelo de versão por arquivo: quem quiser migra (desmarca o v1, procura o v2); quem
+não migrar segue no v1 sem quebrar.
 
-- **Corrige o path e não quebra:** quem não setar `CALCCP_DIR` cai no fallback `Z:\CP`, que é onde os
-  arquivos (`CalcCP.py`, `.xlam`…) realmente estão na share. A mudança é retrocompatível e ainda
-  conserta o fallback (o `Z:\CP\CalcCP` baked na v1.1 não existia).
+**O que muda no v2:** o `PYTHONPATH` embutido passa de `Z:\CP\CalcCP` (baked no v1, apontava para uma
+subpasta inexistente — os arquivos ficam direto em `Z:\CP`) para **`%CALCCP_DIR%;Z:\CP`**: o add-in lê
+a pasta da variável de ambiente **`CALCCP_DIR`** (de usuário, sem admin) e cada PC aponta para onde a
+pasta estiver de fato — share com letra de drive diferente, cópia local etc.
+
+- **Fórmulas idênticas ao v1:** o `vbaProject.bin` do v2 é byte-a-byte igual ao do v1 (mesmas 32 UDFs
+  `cp*`); a única diferença é a config de path. A migração v1→v2 é só re-registrar o `.xlam`.
+- **Fallback certo:** quem não setar `CALCCP_DIR` cai em `Z:\CP`, onde os arquivos realmente estão
+  (conserta o `Z:\CP\CalcCP` do v1, que não existia).
 - **Config manual no banco:** `setx CALCCP_DIR "<pasta>"` (uma linha, por usuário) → reiniciar o Excel.
-- **Diagnóstico:** `=cpTeste()` e o botão **Sobre** passam a mostrar se a `CALCCP_DIR` foi lida ou se
-  está no fallback.
-- **Repo público:** o `.xlam` só carrega `%CALCCP_DIR%` e a letra de drive `Z:\CP` (nenhum nome de
-  servidor). O caminho real fica só na env var de cada máquina.
-- **Como foi feito:** editado o `sharedStrings.xml` do `.xlam` direto no zip (sem abrir no Excel), então
-  o `vbaProject.bin` ficou byte-a-byte idêntico — sem re-registro e sem PII nova. Mesmo nome de
-  arquivo (`CalcCP_v1.xlam`), só a lógica subiu para `VERSION = "1.2.0"`.
+- **Diagnóstico:** `=cpTeste()` e o botão **Sobre** mostram se a `CALCCP_DIR` foi lida ou se está no fallback.
+- **Repo público:** o `.xlam` só carrega `%CALCCP_DIR%` + a letra de drive `Z:\CP` (nenhum nome de servidor).
+- **Como foi feito:** `CalcCP_v2.xlam` gerado a partir do v1 original editando o `sharedStrings.xml`
+  direto no zip (sem abrir no Excel) → `vbaProject.bin` intacto, sem PII. `VERSION` do `.py` → `2.0.0`
+  (o `gerar_bundle.py` nomeia o `.xlam` pelo major → `CalcCP_v2.xlam`). Bundle passa a cuspir o v2.
 
 ## v1.1.0 — 2026-07-13 — renomeado para **CalcCP** + nova pasta na share
 > ✅ **Em produção no banco desde 14/07/2026** (instalado em `Z:\CP\CalcCP` via bundle, add-in
