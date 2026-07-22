@@ -30,9 +30,11 @@ Datas aceitam `"dd/mm/aaaa"`, célula de data ou `HOJE()`.
    python -c "import xlwings,os,sys,glob; r=os.path.dirname(sys.executable); print(xlwings.__version__); print(glob.glob(os.path.join(r,'xlwings*.dll')))"
    ```
    Esperado: `0.36.6` e a lista com `xlwings64-0.36.6.dll`. Se não, ver [erro de DLL](#erro-file-not-found-xlwings64-0366dll).
-3. **A pasta do add-in na share, em `Z:\CP\CalcCP`** — é o `PYTHONPATH`
-   embutido no `.xlam` (tem que ser ESSE caminho). Conteúdo mínimo:
-   `CalcCP_v1.xlam`, `CalcCP.py`, `apis.py`, `di.py`, `config.py`,
+3. **A pasta do add-in acessível pelo PC.** A partir da v1.2 o caminho **não é mais fixo**: o
+   `.xlam` lê a pasta da variável de ambiente **`CALCCP_DIR`** (com fallback para `Z:\CP\CalcCP`,
+   se a variável não estiver setada — ver [passo 2](#2-variáveis-de-ambiente-do-usuário-segredos--proxy--pasta)).
+   Assim cada PC pode apontar para onde a pasta estiver (share com letra diferente, cópia local etc.).
+   Conteúdo mínimo da pasta: `CalcCP_v1.xlam`, `CalcCP.py`, `apis.py`, `di.py`, `config.py`,
    `feriados_anbima.csv`. Puxar do repositório do projeto (ou extrair o `CalcCP_bundle.py`).
 
 ---
@@ -40,8 +42,9 @@ Datas aceitam `"dd/mm/aaaa"`, célula de data ou `HOJE()`.
 ## Instalar no banco
 
 ### 1. Colocar a pasta na share
-Garanta que `Z:\CP\CalcCP` existe com os arquivos acima. A share precisa
-estar acessível quando o Excel abre. (Alternativa rápida: jogue só o `CalcCP_bundle.py`
+Coloque os arquivos numa pasta acessível quando o Excel abre — pode ser a share do time
+(`Z:\CP\CalcCP` é o default de fallback) **ou qualquer outro caminho**, desde que você aponte a
+variável `CALCCP_DIR` para ele (passo 2). (Alternativa rápida: jogue só o `CalcCP_bundle.py`
 na pasta e rode `python CalcCP_bundle.py` — ele extrai tudo.)
 
 > **Atualizar depois** = baixar o bundle novo na share e rodar de novo. Ele **pula todo arquivo que
@@ -50,18 +53,27 @@ na pasta e rode `python CalcCP_bundle.py` — ele extrai tudo.)
 > planilha. Se algum arquivo tiver MESMO mudado e estiver travado pelo Excel, ele avisa qual e sai
 > com erro (aí sim, fechar o Excel e repetir).
 
-### 2. Variáveis de ambiente do usuário (segredos + proxy)
-No banco não há `.env`; os segredos entram por variável de ambiente **do usuário**:
+### 2. Variáveis de ambiente do usuário (segredos + proxy + pasta)
+No banco não há `.env`; os segredos e o caminho da pasta entram por variável de ambiente **do
+usuário** (nenhuma precisa de admin/sistema):
 
 | Variável | Conteúdo |
 |---|---|
+| `CALCCP_DIR` | **pasta onde estão os arquivos do add-in** neste PC. Se não setar, o `.xlam` cai no fallback `Z:\CP\CalcCP`. |
 | `token_calc_b3` | token do B3 Calculator |
 | `token_fianalytics` | API key do FI Analytics |
 | `user_fianalytics` | e-mail do usuário FI (só p/ o fallback bondbuilder; opcional) |
 | `proxy_http` | `http://USUARIO:SENHA@HOST:PORTA` |
 | `proxy_https` | `http://USUARIO:SENHA@HOST:PORTA` |
 
-Sem elas, `=cpTeste()` dá "OK" mas `=cpPu` retorna `ERRO: APIs sem resposta (B3/FI)`.
+`CALCCP_DIR` é o que resolve o path por PC. Setar (CMD, sem admin) e **reiniciar o Excel**:
+```
+setx CALCCP_DIR "Z:\CP"
+```
+(troque pelo caminho real onde estão os `.py` e o `.xlam` nesta máquina). O botão **Sobre** e o
+`=cpTeste()` mostram se ela foi lida ou se está no fallback.
+
+Sem as de API, `=cpTeste()` dá "OK" mas `=cpPu` retorna `ERRO: APIs sem resposta (B3/FI)`.
 
 ### 3. Liberar acesso ao VBA (uma vez)
 Excel → Opções → **Central de Confiabilidade** → Configurações de Macro → marcar
@@ -95,7 +107,7 @@ Esse arquivo é **por PC e por usuário** (não vai pro repositório).
 ### 6. Testar
 Feche e reabra o Excel:
 ```
-=cpTeste()                              -> OK v1.1.0 — path: Z:\CP\CalcCP
+=cpTeste()                              -> OK v1.2.0 — path: Z:\CP — CALCCP_DIR=Z:\CP
 =cpPu("FGEN13"; "13/06/2025"; 6,4686%)  -> ~961,70
 =cpPu("DI1F27"; "01/07/2026"; 10%)      -> ~95310,20   (DI, cálculo local)
 ```

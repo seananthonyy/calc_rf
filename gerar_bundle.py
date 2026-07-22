@@ -25,7 +25,7 @@ def _versao():
 VERSION = _versao()
 XLAM = f"CalcCP_v{VERSION.split('.')[0]}.xlam"   # ex.: _v1.xlam
 
-# Arquivos que vão pra share (Z:\CP\CalcCP):
+# Arquivos que vão pra pasta do add-in (padrão Z:\CP\CalcCP; override via CALCCP_DIR):
 ARQUIVOS = [
     XLAM,
     "CalcCP.py",
@@ -44,9 +44,9 @@ Baixe SÓ este arquivo, jogue na pasta destino e rode:
     python CalcCP_bundle.py
 
 Escreve todos os arquivos do add-in na pasta atual (ou passe outra pasta como arg).
-Os .py + o .csv precisam ficar no PYTHONPATH que o .xlam espera:
-    Z:/CP/CalcCP   (baked no .xlam, com barra invertida)
-Se a share do banco tiver outro caminho, o .xlam precisa ser re-baked com o path certo.
+Os .py + o .csv precisam ficar na pasta que o .xlam procura, definida pela variável de
+ambiente CALCCP_DIR (fallback Z:/CP/CalcCP se ela não estiver setada). Setar por PC:
+    setx CALCCP_DIR "<pasta desta instalação>"   (e reiniciar o Excel)
 
 O .xlam é VERSIONADO ({XLAM}) — instalar/registrar ESTE arquivo. Versões antigas
 (_v1, _v2...) ficam na share e nunca são apagadas (não quebram quem já usa).
@@ -97,8 +97,9 @@ def main():
         print("\\n*** NAO FOI POSSIVEL ESCREVER (arquivo em uso): " + ", ".join(travados))
         print("*** Esses arquivos MUDARAM e estao travados — feche o Excel e rode de novo.")
         sys.exit(1)
-    print("Lembre: essa pasta precisa ser Z:\\\\CP\\\\CalcCP "
-          "(ou re-bake o .xlam com o path certo).")
+    print("Lembre: aponte a variavel de ambiente CALCCP_DIR para esta pasta "
+          "(setx CALCCP_DIR \\"" + DEST + "\\") e reinicie o Excel. "
+          "Sem ela, o .xlam usa o fallback Z:\\\\CP\\\\CalcCP.")
 
 if __name__ == "__main__":
     main()

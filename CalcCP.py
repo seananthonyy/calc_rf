@@ -15,7 +15,7 @@ _EXCEL_EPOCH = date_type(1899, 12, 30)
 
 # Versão da lógica (.py). O .xlam é versionado por NOME de arquivo (CalcCP_vN.xlam);
 # a lógica aqui é retrocompatível (só adiciona UDF, nunca remove/renomeia) — ver CHANGELOG.md.
-VERSION = "1.1.0"
+VERSION = "1.2.0"
 
 # Todas as UDFs têm o prefixo cp (ex.: =cpPu, =cpTaxa, =cpVna...).
 # Títulos com API (debênture, CRI/CRA, NTN-B…): via B3 → FI Analytics → bondbuilder.
@@ -102,7 +102,9 @@ def cpTeste():
     """Diagnóstico: versão + OK, ou o erro de import."""
     if _IMPORT_ERROR:
         return f"ERRO import: {_IMPORT_ERROR}"
-    return f"OK v{VERSION} — path: {_THIS_DIR}"
+    env = os.environ.get("CALCCP_DIR")
+    origem = f"CALCCP_DIR={env}" if env else "CALCCP_DIR não setada (fallback)"
+    return f"OK v{VERSION} — path: {_THIS_DIR} — {origem}"
 
 
 @xw.func
@@ -123,11 +125,14 @@ def Sobre():
     import ctypes
     udfs = sorted(n for n, v in globals().items() if n.startswith("cp") and callable(v))
     estado = f"ERRO no import: {_IMPORT_ERROR}" if _IMPORT_ERROR else "APIs carregadas (B3 / FI / BCB / IBGE)"
+    env = os.environ.get("CALCCP_DIR")
+    origem = f"CALCCP_DIR = {env}" if env else "CALCCP_DIR não setada (usando fallback do .xlam)"
     texto = (
         f"CalcCP — Renda Fixa no Excel\n\n"
         f"Versão da lógica:  {VERSION}\n"
         f"Fórmulas:          {len(udfs)} (todas com prefixo cp)\n"
-        f"Estado:            {estado}\n\n"
+        f"Estado:            {estado}\n"
+        f"Origem do path:    {origem}\n\n"
         f"Pasta:\n{_THIS_DIR}\n\n"
         f"Python:\n{sys.executable}\n\n"
         f"Guia de uso: abra o COMO_USAR.html que está na pasta acima."
