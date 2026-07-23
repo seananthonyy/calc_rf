@@ -167,9 +167,14 @@ Depois de instalado, a aba do ribbon aparece como **CalcCP**.
   chamam essas, não `PrecoB3`/`PrecoFi` direto.
 - **Cache em memória** por `(origem, ticker, data, taxa/pu)`, inclusive `None`, p/ não martelar a
   rede a cada recálculo.
-- **Cache em disco (TTL)** — `_CacheSet`/`_Persistir`/`_CarregarCacheDisco`: só resultados VÁLIDOS
+- **Cache em disco (TTL)** — `_CacheSet`/`_FlushDisco`/`_CarregarCacheDisco`: só resultados VÁLIDOS
   (nunca `None`/erro) vão p/ `%TEMP%\calcrf_cache.json`, com validade `CACHE_TTL_SEG` (600 s).
   Sobrevive a reabrir o Excel; fora do TTL, refaz a chamada. Escrita atômica, falha de I/O ignorada.
+  **Gravação debounced (v3.0.1):** o registro fica em memória (`_discoRegistro`, lido 1× no import) e
+  é gravado no máximo a cada `_MIN_FLUSH_SEG` (3 s), com um `atexit` garantindo o flush final ao
+  fechar o Excel. Antes, cada `_CacheSet` relia+reescrevia o arquivo inteiro (num F9 de N células, N
+  leituras+parses); agora um burst de 300 sets faz **1** gravação. O flush mescla o que outras
+  instâncias do Excel gravaram no mesmo arquivo (vence o timestamp mais novo).
 - **Memo de fonte por ticker** — `_fonteTicker` (`Preco`/`TaxaOp`): lembra se B3, FI ou bondbuilder
   respondeu o ticker (só em sucesso) e tenta essa primeiro; SEMPRE mantém o fallback (só reordena).
 - **Circuit-breaker por base** — `_Abrir`/`_EmCooldown` (`COOLDOWN_SEG=20`): timeout/erro de REDE

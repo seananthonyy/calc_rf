@@ -25,6 +25,7 @@ import csv
 import math
 import re
 from datetime import date, timedelta
+from functools import lru_cache
 from pathlib import Path
 
 # código do mês de vencimento (4º caractere do ticker)
@@ -60,7 +61,12 @@ def ProximoDu(d: date, feriados=FERIADOS) -> date:
     return d
 
 
+@lru_cache(maxsize=4096)
 def ContarDu(ini: date, fim: date, feriados=FERIADOS) -> int:
+    # Memoizado: o intervalo (ini, fim) se repete muito — cpPu/cpDur/cpTaxa do
+    # mesmo contrato+data caem no mesmo (ini, venc), e várias linhas costumam
+    # apontar para o mesmo vencimento. O laço dia-a-dia roda só na 1ª vez.
+    # (FERIADOS é constante do módulo → a chave de cache é efetivamente (ini, fim).)
     if ini >= fim:
         return 0
     return sum(1 for i in range((fim - ini).days) if EhDu(ini + timedelta(days=i), feriados))
@@ -91,9 +97,11 @@ def _Parsear(ticker) -> date:
     return date(2000 + int(m.group(2)), MESES_DI[m.group(1)], 1)
 
 
+@lru_cache(maxsize=1024)
 def VencimentoDi(ticker) -> date:
-    """Vencimento: 1º dia útil do mês/ano (salta FDS/feriado)."""
-    return ProximoDu(_Parsear(ticker))
+    """Vencimento: 1º dia útil do mês/ano (salta FDS/feriado).
+    Memoizado — depende só do ticker (poucas dezenas de contratos distintos)."""
+    return ProximoDu(_Parsear(str(ticker).upper().strip()))
 
 
 def _Du(dataBase: date, ticker) -> int:

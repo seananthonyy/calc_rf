@@ -4,6 +4,32 @@ Versionamento: a **lógica** (`.py`) é retrocompatível; o **`.xlam` é version
 (`CalcCP_vN.xlam`) — versões antigas ficam na share e não quebram quem já usa.
 `VERSION` no `CalcCP.py` acompanha a lógica.
 
+## v3.0.1 — 2026-07-23 — otimização de performance (só lógica; **sem re-bake**, `.xlam` v3 inalterado)
+
+Somente `.py` — nenhuma UDF nova, nenhuma assinatura mudou → o `CalcCP_v3.xlam` continua o mesmo
+(o bundle o pula por ser idêntico). Atualizar = baixar o `CalcCP_bundle.py` e reabrir o Excel.
+**Nenhum número ou formato de retorno mudou** (validado contra golden dos resultados da v3.0.0).
+
+- **SQLite (fórmulas ANBIMA) usa índice em vez de varrer a tabela.** As consultas comparavam
+  `upper(cdTicker) = ?`, o que **anulava o índice** e forçava um SCAN — no histórico (136k linhas)
+  isso era ~160× mais lento que o necessário. Como a base guarda os tickers sempre em maiúsculas e
+  já os maiusculamos no Python, passamos a comparar a coluna crua (`cdTicker = ?`): vira SEARCH por
+  índice, e o `ORDER BY dtReferencia DESC` sai de graça (2ª coluna da PK, sem sort). Medido: 200
+  consultas de referência de 163 ms → 1 ms.
+- **Histórico sem JOIN.** `HistoricoIndicativoAnbima` fazia um JOIN linha-a-linha com InfoAtivos só
+  para repetir a referência (constante por ticker) em cada linha. Agora busca a referência uma vez
+  (reaproveitando o cache de `ReferenciaAnbima`) e faz uma consulta de tabela única, indexada.
+  Resultado idêntico.
+- **Cache em disco das APIs com gravação *debounced*.** Cada `_CacheSet` válido reescrevia o arquivo
+  JSON inteiro (lendo-o antes) — num F9 de N células novas, N leituras + N reescritas. Agora o
+  registro vive em memória e é gravado no máximo a cada 3 s, com `atexit` para o flush final ao
+  fechar o Excel; o flush mescla o que outras instâncias gravaram. Um burst de 300 respostas passou
+  de ~300 gravações para **1**.
+- **DI local memoizado.** `VencimentoDi` e `ContarDu` (o laço dia-a-dia de dias úteis) ganharam
+  `lru_cache`. Numa planilha com muitos contratos DI, `cpPu`/`cpDur`/`cpTaxa` do mesmo contrato+data
+  e as várias linhas apontando para o mesmo vencimento passam a reusar a contagem: cenário de 400
+  linhas × 3 fórmulas caiu de ~1790 ms para ~7 ms.
+
 ## v3.0.0 — 2026-07-23 — `CalcCP_v3.xlam`: fórmulas ANBIMA (referência e taxas indicativas)
 
 **3 fórmulas novas (35 no total)**, as únicas do add-in que **não vêm de API** — esses dados só

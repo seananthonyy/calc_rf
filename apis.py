@@ -19,6 +19,7 @@ import os
 import re
 import json
 import time
+import atexit
 import base64
 import tempfile
 import http.client
@@ -51,6 +52,13 @@ TIMEOUT_SEG  = 6  # timeout curto por chamada para não travar o Excel
 # (nunca None/erro), com validade de CACHE_TTL_SEG. Fora do TTL, refaz a chamada.
 CACHE_TTL_SEG = 600  # 10 min
 _CACHE_FILE = os.path.join(tempfile.gettempdir(), "calcrf_cache.json")
+
+# Gravação do cache em disco é "debounced": num recálculo em massa (F9), cada
+# célula nova geraria uma reescrita do arquivo inteiro. Em vez disso mantemos o
+# registro em MEMÓRIA e gravamos no máximo a cada _MIN_FLUSH_SEG; o atexit
+# garante o flush final ao fechar o Excel. O disco só serve p/ aquecer a próxima
+# sessão — perder alguns segundos do fim de um burst é irrelevante.
+_MIN_FLUSH_SEG = 3.0
 
 _CACHE_AUSENTE = object()
 
@@ -109,6 +117,12 @@ _fonteTicker: dict = {}   # ticker(upper) -> "b3"|"fi"|"bb": qual fonte responde
 _userBonds = None         # cache 1x/processo do getuserbonds: lista de {bond_name,_id} ou None
 _userBondsBuscado = False
 
+# Espelho em memória do cache de disco: chaveStr -> {"k":list, "v":valor, "t":ts}.
+# Carregado 1× no import; sincronizado com o arquivo só nos flushes (não a cada set).
+_discoRegistro: dict = {}
+_discoSujo = False
+_discoUltimoFlush = 0.0
+
 
 # ─── cache em disco (TTL) ────────────────────────────────────────────────────
 
@@ -122,30 +136,51 @@ def _LerArquivoCache() -> dict:
 
 
 def _CarregarCacheDisco():
-    """Carrega no cache em memória as entradas do arquivo ainda dentro do TTL."""
+    """Carrega, no import, as entradas do arquivo ainda dentro do TTL — tanto no
+    cache em memória (respostas) quanto no espelho de disco (p/ os flushes)."""
     agora = time.time()
-    for entrada in _LerArquivoCache().values():
+    for chaveStr, entrada in _LerArquivoCache().items():
         try:
-            if agora - entrada["t"] < CACHE_TTL_SEG:
+            if isinstance(entrada, dict) and agora - entrada["t"] < CACHE_TTL_SEG:
                 _cacheRespostas[tuple(entrada["k"])] = entrada["v"]
+                _discoRegistro[chaveStr] = entrada
         except Exception:
             pass
 
 
-def _Persistir(chave, valor):
-    """Grava (merge) uma entrada válida no arquivo, podando as já expiradas.
-    Escrita atômica (tmp + replace); qualquer falha de I/O é ignorada (cache é best-effort)."""
+def _FlushDisco(forcado=False):
+    """Grava o espelho no arquivo, no máximo a cada _MIN_FLUSH_SEG (ou já, se
+    `forcado`). Antes de gravar, mescla o que outros processos tenham escrito e
+    poda as entradas expiradas. Escrita atômica; falha de I/O é ignorada."""
+    global _discoSujo, _discoUltimoFlush
+    if not _discoSujo:
+        return
+    agora = time.time()
+    if not forcado and agora - _discoUltimoFlush < _MIN_FLUSH_SEG:
+        return
     try:
-        agora = time.time()
-        dados = {k: v for k, v in _LerArquivoCache().items()
+        # Mescla entradas de outros processos (outra instância do Excel usa o mesmo
+        # arquivo em %TEMP%); em conflito, vence o timestamp mais novo.
+        for chaveStr, entrada in _LerArquivoCache().items():
+            if isinstance(entrada, dict):
+                atual = _discoRegistro.get(chaveStr)
+                if atual is None or entrada.get("t", 0) > atual.get("t", 0):
+                    _discoRegistro[chaveStr] = entrada
+        vivos = {k: v for k, v in _discoRegistro.items()
                  if isinstance(v, dict) and agora - v.get("t", 0) < CACHE_TTL_SEG}
-        dados["|".join(map(str, chave))] = {"k": list(chave), "v": valor, "t": agora}
+        _discoRegistro.clear()
+        _discoRegistro.update(vivos)
         tmp = _CACHE_FILE + ".tmp"
         with open(tmp, "w", encoding="utf-8") as f:
-            json.dump(dados, f)
+            json.dump(_discoRegistro, f)
         os.replace(tmp, _CACHE_FILE)
+        _discoSujo = False
+        _discoUltimoFlush = agora
     except Exception:
         pass
+
+
+atexit.register(_FlushDisco, forcado=True)   # garante o flush final ao fechar o Excel
 
 
 def _CacheGet(chave):
@@ -153,9 +188,14 @@ def _CacheGet(chave):
 
 
 def _CacheSet(chave, valor):
+    global _discoSujo
     _cacheRespostas[chave] = valor
     if valor is not None:            # só persiste resultado válido (nunca None/erro)
-        _Persistir(chave, valor)
+        _discoRegistro["|".join(map(str, chave))] = {
+            "k": list(chave), "v": valor, "t": time.time(),
+        }
+        _discoSujo = True
+        _FlushDisco()
 
 
 def _Abrir(req, base=None):
@@ -165,9 +205,11 @@ def _Abrir(req, base=None):
 
 def LimparCache():
     """Esvazia o cache (memória+disco), o token, o memo e os bonds."""
-    global _tokenB3, _userBonds, _userBondsBuscado
+    global _tokenB3, _userBonds, _userBondsBuscado, _discoSujo
     _cacheRespostas.clear()
     _fonteTicker.clear()
+    _discoRegistro.clear()
+    _discoSujo = False
     _tokenB3 = None
     _userBonds = None
     _userBondsBuscado = False
