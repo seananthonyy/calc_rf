@@ -15,7 +15,7 @@ _EXCEL_EPOCH = date_type(1899, 12, 30)
 
 # Versão da lógica (.py). O .xlam é versionado por NOME de arquivo (CalcCP_vN.xlam);
 # a lógica aqui é retrocompatível (só adiciona UDF, nunca remove/renomeia) — ver CHANGELOG.md.
-VERSION = "2.0.0"
+VERSION = "3.0.0"
 
 # Todas as UDFs têm o prefixo cp (ex.: =cpPu, =cpTaxa, =cpVna...).
 # Títulos com API (debênture, CRI/CRA, NTN-B…): via B3 → FI Analytics → bondbuilder.
@@ -30,6 +30,15 @@ try:
     import di
 except Exception as _e:
     _IMPORT_ERROR = str(_e)
+
+# Fórmulas ANBIMA: leem o trades.db (negociação secundária) em SOMENTE LEITURA.
+# Import separado de propósito — se a base/módulo faltar, só as fórmulas ANBIMA
+# param; o resto do add-in (que é API) continua funcionando.
+_DB_ERROR = None
+try:
+    import basedados
+except Exception as _e:
+    _DB_ERROR = str(_e)
 
 
 # ─── helpers ─────────────────────────────────────────────────────────────────
@@ -97,22 +106,34 @@ def main():
 # DIAGNÓSTICO
 # =============================================================================
 
+def _diag_banco():
+    """Uma linha sobre o trades.db (fórmulas ANBIMA) para o diagnóstico."""
+    if _DB_ERROR:
+        return f"trades.db: ERRO import ({_DB_ERROR})"
+    try:
+        return basedados.Diagnostico()
+    except Exception as e:
+        return f"trades.db: ERRO ({e})"
+
+
 @xw.func
 def cpTeste():
-    """Diagnóstico: versão + OK, ou o erro de import."""
+    """Diagnóstico: versão, pasta, origem do path e estado do trades.db."""
     if _IMPORT_ERROR:
         return f"ERRO import: {_IMPORT_ERROR}"
     env = os.environ.get("CALCCP_DIR")
     origem = f"CALCCP_DIR={env}" if env else "CALCCP_DIR não setada (fallback)"
-    return f"OK v{VERSION} — path: {_THIS_DIR} — {origem}"
+    return f"OK v{VERSION} — path: {_THIS_DIR} — {origem} — {_diag_banco()}"
 
 
 @xw.func
 def cpLimparCache():
-    """Esvazia o cache das APIs (B3/FI/BCB) e força novas chamadas."""
+    """Esvazia o cache das APIs (B3/FI/BCB) e o das consultas ao trades.db."""
     if _IMPORT_ERROR:
         return f"ERRO import: {_IMPORT_ERROR}"
     LimparCache()
+    if not _DB_ERROR:
+        basedados.LimparCache()
     return "cache limpo"
 
 
@@ -133,6 +154,7 @@ def Sobre():
         f"Fórmulas:          {len(udfs)} (todas com prefixo cp)\n"
         f"Estado:            {estado}\n"
         f"Origem do path:    {origem}\n\n"
+        f"{_diag_banco()}\n\n"
         f"Pasta:\n{_THIS_DIR}\n\n"
         f"Python:\n{sys.executable}\n\n"
         f"Guia de uso: abra o COMO_USAR.html que está na pasta acima."
@@ -365,6 +387,94 @@ def cpAniversario(ticker):
         return float(v) if v is not None else "ERRO: aniversário indisponível"
     except Exception as e:
         return _erro("aniv", e)
+
+
+# =============================================================================
+# ANBIMA — referência e taxas indicativas (trades.db, SOMENTE LEITURA)
+# -----------------------------------------------------------------------------
+# Únicas fórmulas que NÃO vêm de API: esses dados só existem na base do projeto
+# de negociação secundária. O caminho do arquivo é descoberto em tempo de
+# execução (config.ResolverTradesDb) — ou fixado na variável TRADES_DB_PATH.
+#
+# Convenção de retorno:
+#   "#N/A"   → o papel/dado não existe na base (resposta legítima);
+#   "ERRO: " → problema de infraestrutura (base não encontrada, ilegível).
+# As taxas saem em DECIMAL (7,5983% → 0,075983), como nas demais fórmulas de
+# taxa do add-in (=cpTaxa, =cpTaxaEmissao, =cpSelic) — formate a célula como %.
+# =============================================================================
+
+_NA = "#N/A"
+
+
+def _taxa_decimal(taxa):
+    """% a.a. publicado → decimal, sem ruído de float (7,6411 → 0,076411)."""
+    return float(f"{float(taxa) / 100:.10g}")
+
+
+def _db_indisponivel():
+    """Mensagem de erro se a camada de base não puder ser usada; senão None."""
+    if _DB_ERROR:
+        return f"ERRO import: {_DB_ERROR}"
+    return None
+
+
+@xw.func
+def cpAnbimaRef(ticker):
+    """Vértice/título público de REFERÊNCIA cadastrado para o papel
+    (ex.: "NTN-B 35", "DI1F29"). Fonte: trades.db (InfoAtivos.cdReferencia).
+    Devolve #N/A se o papel não estiver na base ou não tiver referência."""
+    erro = _db_indisponivel()
+    if erro:
+        return erro
+    try:
+        ref = basedados.ReferenciaAnbima(ticker)
+        return ref if ref else _NA
+    except basedados.BancoIndisponivel as e:
+        return f"ERRO: {e}"
+    except Exception as e:
+        return _erro("anbimaRef", e)
+
+
+@xw.func
+def cpAnbimaIndicativo(ticker):
+    """Taxa indicativa ANBIMA mais RECENTE disponível na base para o papel, em
+    DECIMAL (formate a célula como %). Fonte: trades.db (AnbimaIndicativos).
+    Devolve #N/A se o papel não tiver indicativo publicado.
+    (O histórico com as datas está em =cpAnbimaIndicativoHistorico.)"""
+    erro = _db_indisponivel()
+    if erro:
+        return erro
+    try:
+        ind = basedados.IndicativoAnbima(ticker)
+        return _taxa_decimal(ind["taxa"]) if ind else _NA
+    except basedados.BancoIndisponivel as e:
+        return f"ERRO: {e}"
+    except Exception as e:
+        return _erro("anbimaInd", e)
+
+
+@xw.func
+def cpAnbimaIndicativoHistorico(ticker):
+    """Histórico COMPLETO de indicativos ANBIMA do papel (spill), do mais recente
+    para o mais antigo: Data | Ticker | Ref | Taxa Indicativa.
+    Taxa em DECIMAL (formate a coluna como %). Fonte: trades.db."""
+    erro = _db_indisponivel()
+    if erro:
+        return erro
+    try:
+        linhas = basedados.HistoricoIndicativoAnbima(ticker)
+        if not linhas:
+            return _NA
+        saida = [["Data", "Ticker", "Ref", "Taxa Indicativa"]]
+        for l in linhas:
+            saida.append([
+                _data_saida(l["data"]), l["ticker"], l["ref"], _taxa_decimal(l["taxa"]),
+            ])
+        return saida
+    except basedados.BancoIndisponivel as e:
+        return f"ERRO: {e}"
+    except Exception as e:
+        return f"ERRO: {e}"
 
 
 # =============================================================================

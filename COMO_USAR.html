@@ -129,6 +129,22 @@
   </section>
 
   <section>
+    <h2>🏛️ ANBIMA — referência e taxa indicativa</h2>
+    <p class="sub">Vêm da nossa base de negociação secundária (não é API). As taxas vêm em decimal
+      (0,075983) — formate como % pra ver 7,5983%. <b>#N/A</b> = o papel não está na base.</p>
+    <table>
+      <tr><th>Fórmula</th><th>O que faz</th><th>Exemplo</th><th>Fonte</th></tr>
+      <tr><td class="f">cpAnbimaRef</td><td>O vértice/título público de <b>referência</b> do papel</td>
+          <td><code>=cpAnbimaRef("FGEN13")</code> → <span class="res">NTN-B 27</span></td><td class="src">Base ANBIMA</td></tr>
+      <tr><td class="f">cpAnbimaIndicativo</td><td>Taxa indicativa ANBIMA <b>mais recente</b> do papel</td>
+          <td><code>=cpAnbimaIndicativo("FGEN13")</code> → <span class="res">0,075983</span> (= 7,5983%)</td><td class="src">Base ANBIMA</td></tr>
+      <tr><td class="f">cpAnbimaIndicativoHistorico</td><td>Todo o histórico de taxas indicativas do papel:
+          Data · Ticker · Ref · Taxa Indicativa (preenche várias linhas)</td>
+          <td><code>=cpAnbimaIndicativoHistorico("FGEN13")</code></td><td class="src">Base ANBIMA</td></tr>
+    </table>
+  </section>
+
+  <section>
     <h2>📈 Indicadores de mercado</h2>
     <p class="sub">Todos precisam de uma <b>data</b>. As <b>taxas</b> vêm em decimal (0,02) — formate como % pra ver 2%.</p>
     <table>

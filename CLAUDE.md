@@ -4,6 +4,35 @@
 
 Documentação técnica para o Claude Code. Leia antes de alterar qualquer coisa nesta pasta.
 
+> ## 🟢 ATUALIZAÇÃO 23/07/2026 — v3.0.0: `CalcCP_v3.xlam` + fórmulas ANBIMA lendo o `trades.db`
+> **3 UDFs novas (35 no total): `cpAnbimaRef`, `cpAnbimaIndicativo`, `cpAnbimaIndicativoHistorico`.**
+> São as **únicas** que não vêm de API — esses dados só existem na base do projeto de negociação
+> secundária. Isso abre uma **exceção à regra 3 desta pasta** (ver lá embaixo): base local é
+> permitida quando não há API, **em somente leitura**.
+>
+> - **Módulo novo `basedados.py`**: toda a leitura do SQLite. Conexão por URI `?mode=ro` (`uri=True`)
+>   → o SQLite recusa escrita e **não cria `-journal`/`-wal`** ao lado do arquivo, então o pipeline de
+>   negociação segue escrevendo sem disputa. Só `sqlite3` da stdlib. Cache por processo (5 min),
+>   limpo pelo `=cpLimparCache()`.
+> - **`config.ResolverTradesDb()`**: descobre o caminho em runtime. Ordem: `TRADES_DB_PATH` (override
+>   explícito, caminho completo) → para cada raiz candidata (pasta do add-in, `CALCCP_DIR`, e as
+>   pastas-mãe das duas) tenta `<raiz>\<NegociacaoSecundario|negociacao-secundario>\code\data\trades.db`
+>   e, se não achar, varre **um nível** de subpastas (teto de 200 entradas). Memoizado por processo.
+>   ⚠️ **O segmento nominal do caminho de produção (`Z:\<pasta pessoal>\…`) NÃO está escrito no
+>   código** — o repo é público; é justamente por isso que existe a varredura de um nível.
+> - **Novo `.xlam`: `CalcCP_v3.xlam`** (arquivo NOVO; v1 e v2 intocados — mesma política de versão por
+>   arquivo). Gerado no fluxo documentado: re-bake do `CalcCP_DEV.xlam` via COM → scrub de PII no
+>   `vbaProject.bin` → transplante do `.bin` para uma cópia do **v2** (que já tem `%CALCCP_DIR%;Z:\CP`
+>   e `docProps` limpos). Verificado no arquivo final: 35 UDFs no `CodeModule`, `CallUDF("CalcCP")`,
+>   zip íntegro, 0 PII, `absPath` ausente, config preservada.
+> - **Unidade das taxas:** `cpAnbimaIndicativo` e a coluna do histórico saem em **decimal**
+>   (a base guarda `7.5983` = % a.a. → devolvemos `0,075983`), para bater com `cpTaxa`/`cpTaxaEmissao`/
+>   indicadores do BCB. Se um dia isso mudar, é o helper `_taxa_decimal` no `CalcCP.py`.
+> - **`#N/A` × `ERRO:`** — `#N/A` = dado ausente na base (resposta legítima); `ERRO:` = base não
+>   encontrada/ilegível (ambiente). O import do `basedados` é **separado** do das APIs de propósito:
+>   se a base sumir, só as fórmulas ANBIMA param.
+> - `=cpTeste()` e o botão **Sobre** agora terminam com o estado do `trades.db` (com o `max(dtReferencia)`).
+
 > ## 🟢 ATUALIZAÇÃO 22/07/2026 — v2.0.0: `CalcCP_v2.xlam` + pasta por `CALCCP_DIR` (✅ CONFIRMADO FUNCIONANDO)
 > **O caminho da pasta deixou de ser fixo no `.xlam`.** Antes o `PYTHONPATH` baked era `Z:\CP\CalcCP`
 > (que apontava pra subpasta inexistente — os arquivos ficam **direto em `Z:\CP`**). Agora é
@@ -96,8 +125,9 @@ Depois de instalado, a aba do ribbon aparece como **CalcCP**.
 | `CalcCP.py` | as UDFs (`@xw.func`). Roteia DI→`di.py`, resto→`apis.py`. | sim — lógica das funções |
 | `apis.py` | cliente HTTP B3/FI (urllib, stdlib). Segredos + proxy + cache + normaliza NTN-B/F. | sim — APIs, proxy, parsing |
 | `di.py` | cálculo LOCAL de DI (DI1...). Self-contained (lê `feriados_anbima.csv`). | sim — fórmula/calendário DI |
+| `basedados.py` | leitura SOMENTE-LEITURA do `trades.db` (fórmulas ANBIMA). Só `sqlite3`. | sim — consultas ANBIMA |
 | `feriados_anbima.csv` | calendário de feriados (usado pelo `di.py`). | só ao estender datas |
-| `config.py` | só `ENV_PATH` (fallback de dev). | raramente |
+| `config.py` | `ENV_PATH` (fallback de dev) + `ResolverTradesDb()` (descoberta do `trades.db`). | raramente |
 | `CalcCP.xlam` | o add-in. Binário. | só ao mudar nome/assinatura de UDF (ver abaixo) |
 
 ## Segredos e proxy — via VARIÁVEIS DE AMBIENTE
@@ -274,12 +304,17 @@ ALTERAR" (2)). Paliativo enquanto não atualiza: cálculo em **Manual (F9)**.
 2. **NENHUM dado sensível** em arquivo: nada de tokens, senhas, e-mails, caminhos pessoais,
    identificadores de máquina/usuário. Segredos vêm SÓ de variáveis de ambiente. Antes de
    entregar/alterar, varra a pasta atrás de valores reais de credenciais e remova.
-3. Não reintroduza dependência de base local (trades.db) nem a calculadora ANBIMA. **Exceção:** o
-   DI é calculado localmente em `di.py` (não existe API de DI) — isso é intencional e permitido.
+3. Não reintroduza a calculadora ANBIMA local nem faça o add-in depender de base local **para o que
+   já tem API**. **Exceções intencionais** (dado que NÃO existe em API): o DI, calculado em `di.py`,
+   e o `trades.db`, lido em `basedados.py` pelas fórmulas `cpAnbima*`. Nos dois casos: sem escrita
+   (SQLite aberto com `?mode=ro`), sem o caminho embutido no código, e degradando sozinho — se a
+   base sumir, só essas fórmulas param, com mensagem explícita.
 4. `apis.py` usa só a stdlib (urllib). Evite adicionar dependências (mantém o deploy leve).
 
 ## Teste rápido (sanity)
 ```
-python -c "import CalcCP as m; print(m.TESTE()); print(m.PU('FGEN13','13/06/2025',0.064686))"
+python -c "import CalcCP as m; print(m.cpTeste()); print(m.cpPu('FGEN13','13/06/2025',0.064686)); print(m.cpAnbimaRef('FGEN13'), m.cpAnbimaIndicativo('FGEN13'))"
 ```
-Esperado: `OK — path: <esta pasta>` e `961.699686` (com as env vars/`.env` resolvendo os segredos).
+Esperado: `OK v<versão> — path: <esta pasta> — … — trades.db: OK (ANBIMA até <data>)`, `961.699686`
+(com as env vars/`.env` resolvendo os segredos) e `NTN-B 27 0.075983` (valor de 17/07/2026 —
+a taxa muda conforme a base for atualizada; o que importa é vir número, não `#N/A`/`ERRO`).

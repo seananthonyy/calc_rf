@@ -2,8 +2,9 @@
 
 Add-in de planilha (UDFs) para precificar renda fixa e puxar indicadores. Todas as funções têm o
 prefixo **`cp`** (ex.: `=cpPu`). As fontes são as APIs **B3 Calculator**, **FI Analytics** e
-**Banco Central (SGS)/IBGE**; contratos de **DI futuro** (`DI1F27`…) são calculados **localmente**.
-Datas aceitam `"dd/mm/aaaa"`, célula de data ou `HOJE()`.
+**Banco Central (SGS)/IBGE**; contratos de **DI futuro** (`DI1F27`…) são calculados **localmente**;
+as fórmulas **ANBIMA** (`=cpAnbima…`) leem a base do projeto de negociação secundária (`trades.db`),
+em **somente leitura**. Datas aceitam `"dd/mm/aaaa"`, célula de data ou `HOJE()`.
 
 > **Documentação:** este `README.md` cobre uso, instalação e operação. Detalhes de arquitetura,
 > re-bake do `.xlam` e internals do xlwings estão no `CLAUDE.md` (referência de desenvolvimento).
@@ -40,8 +41,13 @@ Datas aceitam `"dd/mm/aaaa"`, célula de data ou `HOJE()`.
    `.xlam` lê a pasta da variável de ambiente **`CALCCP_DIR`** (com fallback para `Z:\CP`,
    se a variável não estiver setada — ver [passo 2](#2-variáveis-de-ambiente-do-usuário-segredos--proxy--pasta)).
    Assim cada PC pode apontar para onde a pasta estiver (share com letra diferente, cópia local etc.).
-   Conteúdo mínimo da pasta: `CalcCP_v2.xlam`, `CalcCP.py`, `apis.py`, `di.py`, `config.py`,
-   `feriados_anbima.csv`. Puxar do repositório do projeto (ou extrair o `CalcCP_bundle.py`).
+   Conteúdo mínimo da pasta: `CalcCP_v3.xlam`, `CalcCP.py`, `apis.py`, `di.py`, `basedados.py`,
+   `config.py`, `feriados_anbima.csv`. Puxar do repositório do projeto (ou extrair o `CalcCP_bundle.py`).
+4. **(Só para as fórmulas ANBIMA) acesso de leitura ao `trades.db`** do projeto de negociação
+   secundária. O add-in **descobre o arquivo sozinho** procurando a árvore
+   `…\NegociacaoSecundario\code\data\trades.db` a partir da pasta do add-in e da pasta-mãe dela
+   (é o layout da share: a pasta do add-in e a do projeto são irmãs). Se estiver em outro lugar,
+   aponte a variável **`TRADES_DB_PATH`** para o arquivo. As demais fórmulas não dependem disso.
 
 ---
 
@@ -71,6 +77,7 @@ usuário** (nenhuma precisa de admin/sistema):
 | `user_fianalytics` | e-mail do usuário FI (só p/ o fallback bondbuilder; opcional) |
 | `proxy_http` | `http://USUARIO:SENHA@HOST:PORTA` |
 | `proxy_https` | `http://USUARIO:SENHA@HOST:PORTA` |
+| `TRADES_DB_PATH` | **opcional** — caminho completo do `trades.db` (só para as fórmulas `=cpAnbima…`). Sem ela, o add-in procura sozinho a pasta `…\NegociacaoSecundario\code\data\` a partir da pasta do add-in e da pasta-mãe. |
 
 `CALCCP_DIR` é o que resolve o path por PC. Setar (CMD, sem admin) e **reiniciar o Excel**:
 ```
@@ -87,8 +94,9 @@ Excel → Opções → **Central de Confiabilidade** → Configurações de Macr
 
 ### 4. Habilitar o add-in
 Excel → Opções → **Suplementos** → "Suplementos do Excel" → **Ir...** → **Procurar** →
-selecionar `Z:\CP\CalcCP_v2.xlam` → OK. (Quem já usa o `CalcCP_v1.xlam` continua funcionando; migrar
-= desmarcar o v1 e procurar o v2. O `v1.xlam` **não é tocado** — fica na pasta do lado do v2.)
+selecionar `Z:\CP\CalcCP_v3.xlam` → OK. (Quem já usa o `CalcCP_v1.xlam`/`_v2.xlam` continua
+funcionando; migrar = desmarcar o antigo e procurar o v3. Os `.xlam` antigos **não são tocados** —
+ficam na pasta do lado do novo. Só o **v3** tem as fórmulas `=cpAnbima…`.)
 As UDFs já vêm **registradas** no `.xlam` (não precisa "Import Functions"). Aparece a aba
 **CalcCP** no ribbon, com o botão **Sobre** — que mostra a versão da lógica, a pasta de onde o
 add-in está lendo, o Python em uso e o estado do import. Como ele roda o Python de verdade
@@ -114,10 +122,13 @@ Esse arquivo é **por PC e por usuário** (não vai pro repositório).
 ### 6. Testar
 Feche e reabra o Excel:
 ```
-=cpTeste()                              -> OK v2.0.0 — path: Z:\CP — CALCCP_DIR=Z:\CP
+=cpTeste()                              -> OK v3.0.0 — path: Z:\CP — CALCCP_DIR=Z:\CP — trades.db: OK (ANBIMA até 2026-07-17) — ...
 =cpPu("FGEN13"; "13/06/2025"; 6,4686%)  -> ~961,70
 =cpPu("DI1F27"; "01/07/2026"; 10%)      -> ~95310,20   (DI, cálculo local)
+=cpAnbimaRef("FGEN13")                  -> NTN-B 27    (leitura do trades.db)
 ```
+O `=cpTeste()` termina com o estado do `trades.db`: `OK (ANBIMA até <data>)` mais o caminho em uso,
+ou a mensagem de que não foi encontrado (aí só as fórmulas `=cpAnbima…` ficam indisponíveis).
 
 ### Checklist (por PC)
 - [ ] Pasta com os arquivos (ex.: `Z:\CP`) atualizada
@@ -128,6 +139,7 @@ Feche e reabra o Excel:
 - [ ] `.xlam` habilitado (aba **CalcCP** aparece)
 - [ ] (se multi-Python) `myaddin.conf` com a chave `Interpreter`
 - [ ] `=cpPu("FGEN13";"13/06/2025";6,4686%)` ≈ 961,70
+- [ ] (fórmulas ANBIMA) `=cpTeste()` diz `trades.db: OK` — senão, setar `TRADES_DB_PATH`
 
 ---
 
@@ -172,6 +184,27 @@ Feche e reabra o Excel:
 > então a agenda **sempre fecha 100%**. É valor derivado — validado contra o `trades.db` (FGEN13
 > 8,025 e MESA13 13,176856, idênticos).
 
+### ANBIMA — referência e taxas indicativas (base local `trades.db`)
+Únicas fórmulas que **não vêm de API**: esses dados só existem na base do projeto de negociação
+secundária, lida em **somente leitura** (o pipeline continua escrevendo nela normalmente).
+
+| Função | Retorno |
+|---|---|
+| `=cpAnbimaRef(ticker)` | Vértice/título público de **referência** do papel (ex.: `NTN-B 35`, `DI1F30`) |
+| `=cpAnbimaIndicativo(ticker)` | Taxa indicativa ANBIMA **mais recente** da base, em **decimal** (formate como %) |
+| `=cpAnbimaIndicativoHistorico(ticker)` | Histórico completo (spill): Data · Ticker · Ref · Taxa Indicativa |
+
+> **Unidade:** as taxas saem em **decimal** (7,5983% → `0,075983`), igual a `=cpTaxa`,
+> `=cpTaxaEmissao` e aos indicadores do BCB — formate a célula/coluna como %.
+>
+> **`#N/A` × `ERRO:`** — `#N/A` significa que o papel (ou o indicativo) **não está na base**, que é
+> resposta legítima; `ERRO: …` significa que a **base não foi encontrada/lida** (problema de
+> ambiente: ver `TRADES_DB_PATH` no passo 2). Linhas com taxa nula são ignoradas.
+>
+> O histórico vem do mais **recente para o mais antigo**, com a `Data` como data de verdade
+> (ordenável/filtrável no Excel), não texto. As consultas ficam em cache por 5 min —
+> `=cpLimparCache()` força releitura.
+
 ### Métricas / gross up (FI Analytics)
 | Função | Retorno |
 |---|---|
@@ -210,8 +243,8 @@ fim de semana/feriado e séries mensais). Ex.: `=cpSelic("31/12/2020")` → 2,0.
 ### Diagnóstico
 | Função | Retorno |
 |---|---|
-| `=cpTeste()` | "OK v{versão} — path: …" ou o erro de import |
-| `=cpLimparCache()` | Esvazia o cache das APIs e força novas chamadas |
+| `=cpTeste()` | "OK v{versão} — path: … — CALCCP_DIR … — trades.db: …" ou o erro de import |
+| `=cpLimparCache()` | Esvazia o cache das APIs **e o das consultas ao `trades.db`** |
 
 **Observações:** erros aparecem como texto `ERRO: …` na célula. O 1º cálculo de um papel bate na
 rede (~1–5 s); os demais vêm do cache (disco, 10 min) — `=cpLimparCache()` força atualização.
@@ -242,6 +275,8 @@ renomeia** (senão quebra planilhas e `.xlam` antigos). O **`.xlam` é versionad
 | `file not found: xlwings64-0.36.6.dll` | Python errado / xlwings ≠ 0.36.6 / DLL ausente | ver abaixo |
 | fórmulas não calculam, PC com vários Python | add-in pegou o Python errado | passo 5 (fixar `Interpreter`) |
 | `ERRO: APIs sem resposta (B3/FI)` | faltam env vars / proxy | passo 2 |
+| `ERRO: trades.db não encontrado` nas `=cpAnbima…` | base fora do layout esperado (ou share não mapeada) | setar `TRADES_DB_PATH` com o caminho completo do arquivo (passo 2) e `=cpLimparCache()` |
+| `#NAME?` só nas `=cpAnbima…` | add-in registrado é o `_v1`/`_v2` (não têm essas fórmulas) | registrar o `CalcCP_v3.xlam` (passo 4) |
 | `Input past end of file` | `myaddin.conf` com linha em branco sobrando | recriar com o snippet do passo 5 |
 | aba não aparece / `#NAME?` | add-in não habilitado ou VBA não liberado | passos 3 e 4 |
 | Excel congela/pisca em planilha do SharePoint | resolução de URL do PYTHONPATH / write-back de UDF assíncrona | já mitigado no `.xlam` (config + UDFs síncronas); paliativo: cálculo Manual/F9. Ver `CLAUDE.md` |

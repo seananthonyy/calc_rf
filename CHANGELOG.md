@@ -4,6 +4,37 @@ Versionamento: a **lógica** (`.py`) é retrocompatível; o **`.xlam` é version
 (`CalcCP_vN.xlam`) — versões antigas ficam na share e não quebram quem já usa.
 `VERSION` no `CalcCP.py` acompanha a lógica.
 
+## v3.0.0 — 2026-07-23 — `CalcCP_v3.xlam`: fórmulas ANBIMA (referência e taxas indicativas)
+
+**3 fórmulas novas (35 no total)**, as únicas do add-in que **não vêm de API** — esses dados só
+existem no `trades.db` do projeto de negociação secundária, lido em **somente leitura**:
+
+| Fórmula | Retorno |
+|---|---|
+| `=cpAnbimaRef(ticker)` | vértice/título público de referência do papel (`InfoAtivos.cdReferencia`) |
+| `=cpAnbimaIndicativo(ticker)` | taxa indicativa ANBIMA mais recente da base, em **decimal** |
+| `=cpAnbimaIndicativoHistorico(ticker)` | histórico completo (spill): Data · Ticker · Ref · Taxa Indicativa |
+
+- **Arquivo NOVO `CalcCP_v3.xlam`** (v1 e v2 ficam intocados na pasta) — fórmula nova exige re-bake, e
+  a política é versão por arquivo: quem quiser as fórmulas ANBIMA registra o v3; quem não migrar
+  segue no v2 sem quebrar. `vbaProject.bin` regenerado com as 35 UDFs; config `%CALCCP_DIR%;Z:\CP`
+  e `docProps` herdados do v2 (0 PII, `absPath` ausente, zip íntegro).
+- **Módulo novo `basedados.py`** (vai no bundle): conexão SQLite por URI **`?mode=ro`** — o banco
+  recusa escrita e não cria `-journal`/`-wal` ao lado do arquivo, então o pipeline de negociação
+  continua escrevendo sem disputa. Só a stdlib (`sqlite3`). Cache de 5 min por processo, esvaziado
+  pelo `=cpLimparCache()` (que agora limpa APIs **e** base).
+- **Caminho da base descoberto em runtime** (`config.ResolverTradesDb`): variável **`TRADES_DB_PATH`**
+  (override, caminho completo) → senão procura `…\NegociacaoSecundario\code\data\trades.db` a partir
+  da pasta do add-in / `CALCCP_DIR` e das pastas-mãe, incluindo um nível de subpastas. Nada de
+  caminho pessoal escrito no código (repo público).
+- **Taxas em decimal** (7,5983% → `0,075983`), como `=cpTaxa`, `=cpTaxaEmissao` e os indicadores do
+  BCB — formate a célula como %. Registros com taxa nula são ignorados.
+- **`#N/A` × `ERRO:`**: `#N/A` = papel/indicativo não está na base (resposta legítima); `ERRO: …` =
+  base não encontrada ou ilegível (ambiente). O import da camada de base é separado do das APIs: se
+  a base sumir, **só** as fórmulas ANBIMA param.
+- **Diagnóstico:** `=cpTeste()` e o botão **Sobre** passam a mostrar o estado do `trades.db`
+  (caminho em uso e data do último indicativo).
+
 ## v2.0.0 — 2026-07-22 — `CalcCP_v2.xlam`: pasta configurável por variável de ambiente (`CALCCP_DIR`)
 
 **Arquivo NOVO `CalcCP_v2.xlam` (o `CalcCP_v1.xlam` fica intocado na pasta).** Como há várias

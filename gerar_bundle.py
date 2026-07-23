@@ -31,6 +31,7 @@ ARQUIVOS = [
     "CalcCP.py",
     "apis.py",
     "di.py",
+    "basedados.py",   # leitura do trades.db (fórmulas ANBIMA)
     "config.py",
     "feriados_anbima.csv",
     "COMO_USAR.html",   # guia pros traders (abre no navegador)
