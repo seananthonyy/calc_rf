@@ -129,19 +129,27 @@
   </section>
 
   <section>
-    <h2>🏛️ ANBIMA — referência e taxa indicativa</h2>
-    <p class="sub">Vêm da nossa base de negociação secundária (não é API). As taxas vêm em decimal
-      (0,075983) — formate como % pra ver 7,5983%. <b>#N/A</b> = o papel não está na base.</p>
+    <h2>🏛️ ANBIMA — referência, taxa indicativa e spread</h2>
+    <p class="sub">Vêm da nossa base de negociação secundária (não é API). As taxas e o spread vêm em
+      decimal (0,075983) — formate como % pra ver 7,5983%. <b>#N/A</b> = o papel não está na base.</p>
     <table>
       <tr><th>Fórmula</th><th>O que faz</th><th>Exemplo</th><th>Fonte</th></tr>
       <tr><td class="f">cpAnbimaRef</td><td>O vértice/título público de <b>referência</b> do papel</td>
           <td><code>=cpAnbimaRef("FGEN13")</code> → <span class="res">NTN-B 27</span></td><td class="src">Base ANBIMA</td></tr>
       <tr><td class="f">cpAnbimaIndicativo</td><td>Taxa indicativa ANBIMA <b>mais recente</b> do papel</td>
           <td><code>=cpAnbimaIndicativo("FGEN13")</code> → <span class="res">0,075983</span> (= 7,5983%)</td><td class="src">Base ANBIMA</td></tr>
+      <tr><td class="f">cpAnbimaSpread</td><td><b>Spread</b> ANBIMA mais recente, sobre a referência acima
+          <span class="tag at">mais esparso que a taxa</span></td>
+          <td><code>=cpAnbimaSpread("FGEN13")</code> → <span class="res">-0,005193</span> (= -51,93 bps)</td><td class="src">Base ANBIMA</td></tr>
       <tr><td class="f">cpAnbimaIndicativoHistorico</td><td>Todo o histórico de taxas indicativas do papel:
-          Data · Ticker · Ref · Taxa Indicativa (preenche várias linhas)</td>
+          Data · Ticker · Ref · Taxa Indicativa · Spread (preenche várias linhas)</td>
           <td><code>=cpAnbimaIndicativoHistorico("FGEN13")</code></td><td class="src">Base ANBIMA</td></tr>
     </table>
+    <p class="sub"><b>Sobre o spread:</b> quando a referência é <code>FUNDING</code> (papéis CDI+ e %CDI)
+      o spread <b>é a própria taxa indicativa</b> — não existe benchmark externo para descontar
+      (CDI+ → CDI + 0,6967%; %CDI → 102,9% do CDI). Ele também é mais esparso que a taxa: só existe
+      onde o papel tem referência cadastrada e há curva de mercado na data, então dá <b>#N/A</b> em
+      mais papéis/datas que <code>cpAnbimaIndicativo</code>.</p>
   </section>
 
   <section>

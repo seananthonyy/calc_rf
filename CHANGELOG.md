@@ -4,6 +4,39 @@ Versionamento: a **lógica** (`.py`) é retrocompatível; o **`.xlam` é version
 (`CalcCP_vN.xlam`) — versões antigas ficam na share e não quebram quem já usa.
 `VERSION` no `CalcCP.py` acompanha a lógica.
 
+## v4.0.0 — 2026-07-27 — `CalcCP_v4.xlam`: `=cpAnbimaSpread` + coluna Spread no histórico
+
+**1 fórmula nova (36 no total)**, na mesma família das ANBIMA — vem do `trades.db`, não de API:
+
+| Fórmula | Retorno |
+|---|---|
+| `=cpAnbimaSpread(ticker)` | spread ANBIMA mais recente do papel sobre a referência de `=cpAnbimaRef`, em **decimal** (`-0,005193` = −51,93 bps) |
+
+E o `=cpAnbimaIndicativoHistorico` ganhou uma **5ª coluna, `Spread`** (mesma unidade), ao lado da
+Taxa Indicativa. Quem já usa a fórmula passa a ver uma coluna a mais no spill — se houver algo
+escrito à direita do intervalo, o Excel devolve `#SPILL!` até a célula ser liberada.
+
+- **Fonte:** `AnbimaIndicativos.vrSpreadAnbima`, calculado pelo pipeline de negociação secundária.
+  Uma consulta indexada nova em `basedados.SpreadAnbima` (mesmo padrão da taxa: linha mais recente
+  com valor não-nulo, cache de 5 min). O histórico passou a trazer a coluna na **mesma** consulta —
+  nenhuma consulta extra.
+- **Unidade:** decimal, igual à taxa. Com referência **`FUNDING`** (papéis CDI+ e %CDI) o spread **é
+  a própria taxa indicativa** — não há benchmark externo a descontar (CDI+ `0,006967` = CDI +
+  0,6967%; %CDI `1,029075` = 102,9% do CDI). Nos demais é a taxa do papel contra a do vértice.
+- **É mais esparso que a taxa** (~42,9k de 136,1k linhas da base): exige referência cadastrada **e**
+  curva de mercado na data. Logo `#N/A` aparece em mais papéis/datas que em `=cpAnbimaIndicativo`, a
+  data do último spread pode ser **anterior** à da última taxa, e no histórico as datas sem spread
+  saem com `#N/A` só nessa coluna.
+- **Arquivo NOVO `CalcCP_v4.xlam`** (v1, v2 e v3 ficam intocados na pasta) — fórmula nova exige
+  re-bake, e a política é **versão por arquivo**: quem quiser o spread registra o v4; quem não migrar
+  segue no v3 sem quebrar. Migração = desmarcar o v3 nos Suplementos e procurar o v4.
+  `vbaProject.bin` regenerado com as 36 UDFs (201.728 → 203.776 bytes) e transplantado para uma cópia
+  do v3, que já tinha a config `%CALCCP_DIR%;Z:\CP` e os `docProps` limpos — verificado no arquivo
+  final: 36 UDFs no `CodeModule`, `CallUDF("CalcCP")`, zip íntegro, 0 PII, `absPath` ausente.
+- **Quem ficar no v3 pega metade:** os `.py` novos valem para qualquer `.xlam` (o VBA só chama o
+  Python), então a **coluna Spread do histórico aparece no v3 também** — ela não depende do re-bake.
+  Só o `=cpAnbimaSpread`, que é UDF nova, dá `#NAME?` até registrar o v4.
+
 ## v3.0.1 — 2026-07-23 — otimização de performance (só lógica; **sem re-bake**, `.xlam` v3 inalterado)
 
 Somente `.py` — nenhuma UDF nova, nenhuma assinatura mudou → o `CalcCP_v3.xlam` continua o mesmo

@@ -41,7 +41,7 @@ em **somente leitura**. Datas aceitam `"dd/mm/aaaa"`, célula de data ou `HOJE()
    `.xlam` lê a pasta da variável de ambiente **`CALCCP_DIR`** (com fallback para `Z:\CP`,
    se a variável não estiver setada — ver [passo 2](#2-variáveis-de-ambiente-do-usuário-segredos--proxy--pasta)).
    Assim cada PC pode apontar para onde a pasta estiver (share com letra diferente, cópia local etc.).
-   Conteúdo mínimo da pasta: `CalcCP_v3.xlam`, `CalcCP.py`, `apis.py`, `di.py`, `basedados.py`,
+   Conteúdo mínimo da pasta: `CalcCP_v4.xlam`, `CalcCP.py`, `apis.py`, `di.py`, `basedados.py`,
    `config.py`, `feriados_anbima.csv`. Puxar do repositório do projeto (ou extrair o `CalcCP_bundle.py`).
 4. **(Só para as fórmulas ANBIMA) acesso de leitura ao `trades.db`** do projeto de negociação
    secundária. O add-in **descobre o arquivo sozinho** procurando a árvore
@@ -94,9 +94,10 @@ Excel → Opções → **Central de Confiabilidade** → Configurações de Macr
 
 ### 4. Habilitar o add-in
 Excel → Opções → **Suplementos** → "Suplementos do Excel" → **Ir...** → **Procurar** →
-selecionar `Z:\CP\CalcCP_v3.xlam` → OK. (Quem já usa o `CalcCP_v1.xlam`/`_v2.xlam` continua
-funcionando; migrar = desmarcar o antigo e procurar o v3. Os `.xlam` antigos **não são tocados** —
-ficam na pasta do lado do novo. Só o **v3** tem as fórmulas `=cpAnbima…`.)
+selecionar `Z:\CP\CalcCP_v4.xlam` → OK. (Quem já usa o `CalcCP_v1.xlam`/`_v2.xlam`/`_v3.xlam`
+continua funcionando; migrar = desmarcar o antigo e procurar o v4. Os `.xlam` antigos **não são
+tocados** — ficam na pasta do lado do novo. As fórmulas `=cpAnbima…` existem a partir do **v3**;
+o `=cpAnbimaSpread`, só no **v4**.)
 As UDFs já vêm **registradas** no `.xlam` (não precisa "Import Functions"). Aparece a aba
 **CalcCP** no ribbon, com o botão **Sobre** — que mostra a versão da lógica, a pasta de onde o
 add-in está lendo, o Python em uso e o estado do import. Como ele roda o Python de verdade
@@ -122,10 +123,11 @@ Esse arquivo é **por PC e por usuário** (não vai pro repositório).
 ### 6. Testar
 Feche e reabra o Excel:
 ```
-=cpTeste()                              -> OK v3.0.0 — path: Z:\CP — CALCCP_DIR=Z:\CP — trades.db: OK (ANBIMA até 2026-07-17) — ...
+=cpTeste()                              -> OK v4.0.0 — path: Z:\CP — CALCCP_DIR=Z:\CP — trades.db: OK (ANBIMA até 2026-07-17) — ...
 =cpPu("FGEN13"; "13/06/2025"; 6,4686%)  -> ~961,70
 =cpPu("DI1F27"; "01/07/2026"; 10%)      -> ~95310,20   (DI, cálculo local)
 =cpAnbimaRef("FGEN13")                  -> NTN-B 27    (leitura do trades.db)
+=cpAnbimaSpread("FGEN13")               -> -0,005193   (= -51,93 bps sobre a NTN-B 27)
 ```
 O `=cpTeste()` termina com o estado do `trades.db`: `OK (ANBIMA até <data>)` mais o caminho em uso,
 ou a mensagem de que não foi encontrado (aí só as fórmulas `=cpAnbima…` ficam indisponíveis).
@@ -184,7 +186,7 @@ ou a mensagem de que não foi encontrado (aí só as fórmulas `=cpAnbima…` fi
 > então a agenda **sempre fecha 100%**. É valor derivado — validado contra o `trades.db` (FGEN13
 > 8,025 e MESA13 13,176856, idênticos).
 
-### ANBIMA — referência e taxas indicativas (base local `trades.db`)
+### ANBIMA — referência, taxas indicativas e spread (base local `trades.db`)
 Únicas fórmulas que **não vêm de API**: esses dados só existem na base do projeto de negociação
 secundária, lida em **somente leitura** (o pipeline continua escrevendo nela normalmente).
 
@@ -192,10 +194,21 @@ secundária, lida em **somente leitura** (o pipeline continua escrevendo nela no
 |---|---|
 | `=cpAnbimaRef(ticker)` | Vértice/título público de **referência** do papel (ex.: `NTN-B 35`, `DI1F30`) |
 | `=cpAnbimaIndicativo(ticker)` | Taxa indicativa ANBIMA **mais recente** da base, em **decimal** (formate como %) |
-| `=cpAnbimaIndicativoHistorico(ticker)` | Histórico completo (spill): Data · Ticker · Ref · Taxa Indicativa |
+| `=cpAnbimaSpread(ticker)` | **Spread** ANBIMA mais recente sobre essa referência, em **decimal** (`-0,005193` = −51,93 bps) |
+| `=cpAnbimaIndicativoHistorico(ticker)` | Histórico completo (spill): Data · Ticker · Ref · Taxa Indicativa · Spread |
 
-> **Unidade:** as taxas saem em **decimal** (7,5983% → `0,075983`), igual a `=cpTaxa`,
+> **Unidade:** as taxas **e o spread** saem em **decimal** (7,5983% → `0,075983`), igual a `=cpTaxa`,
 > `=cpTaxaEmissao` e aos indicadores do BCB — formate a célula/coluna como %.
+>
+> **Spread com referência `FUNDING` (papéis CDI+ e %CDI):** é a **própria taxa indicativa** — nesses
+> papéis não há benchmark externo a descontar, o spread já *é* a remuneração (CDI+ `0,006967` = CDI +
+> 0,6967%; %CDI `1,029075` = 102,9% do CDI). Nos demais (ref. NTN-B/DI1) é a taxa do papel contra a
+> do vértice.
+>
+> **O spread é mais esparso que a taxa** (~1/3 das linhas da base): depende de o papel ter referência
+> cadastrada **e** de haver curva de mercado na data. Por isso `=cpAnbimaSpread` devolve `#N/A` em mais
+> papéis/datas que `=cpAnbimaIndicativo`, e a data do último spread pode ser **anterior** à da última
+> taxa. No histórico, as datas sem spread saem com `#N/A` só nessa coluna.
 >
 > **`#N/A` × `ERRO:`** — `#N/A` significa que o papel (ou o indicativo) **não está na base**, que é
 > resposta legítima; `ERRO: …` significa que a **base não foi encontrada/lida** (problema de
@@ -276,7 +289,8 @@ renomeia** (senão quebra planilhas e `.xlam` antigos). O **`.xlam` é versionad
 | fórmulas não calculam, PC com vários Python | add-in pegou o Python errado | passo 5 (fixar `Interpreter`) |
 | `ERRO: APIs sem resposta (B3/FI)` | faltam env vars / proxy | passo 2 |
 | `ERRO: trades.db não encontrado` nas `=cpAnbima…` | base fora do layout esperado (ou share não mapeada) | setar `TRADES_DB_PATH` com o caminho completo do arquivo (passo 2) e `=cpLimparCache()` |
-| `#NAME?` só nas `=cpAnbima…` | add-in registrado é o `_v1`/`_v2` (não têm essas fórmulas) | registrar o `CalcCP_v3.xlam` (passo 4) |
+| `#NAME?` só nas `=cpAnbima…` | add-in registrado é o `_v1`/`_v2` (não têm essas fórmulas) | registrar o `CalcCP_v4.xlam` (passo 4) |
+| `#NAME?` só em `=cpAnbimaSpread` (as outras `=cpAnbima…` funcionam) | add-in registrado é o `_v3` — a UDF nova só existe no v4 | registrar o `CalcCP_v4.xlam` (passo 4). A coluna Spread do histórico já funciona no v3, porque depende só dos `.py` |
 | `Input past end of file` | `myaddin.conf` com linha em branco sobrando | recriar com o snippet do passo 5 |
 | aba não aparece / `#NAME?` | add-in não habilitado ou VBA não liberado | passos 3 e 4 |
 | Excel congela/pisca em planilha do SharePoint | resolução de URL do PYTHONPATH / write-back de UDF assíncrona | já mitigado no `.xlam` (config + UDFs síncronas); paliativo: cálculo Manual/F9. Ver `CLAUDE.md` |

@@ -4,6 +4,34 @@
 
 Documentação técnica para o Claude Code. Leia antes de alterar qualquer coisa nesta pasta.
 
+> ## 🟢 ATUALIZAÇÃO 27/07/2026 — v4.0.0: `CalcCP_v4.xlam` + `cpAnbimaSpread` (36 UDFs)
+> **1 UDF nova + 1 coluna nova**, na família ANBIMA (`basedados.py`, mesma exceção à regra 3):
+> `cpAnbimaSpread(ticker)` devolve o `AnbimaIndicativos.vrSpreadAnbima` mais recente do papel, e o
+> `cpAnbimaIndicativoHistorico` ganhou a 5ª coluna `Spread`.
+>
+> - **Consulta nova `basedados.SpreadAnbima`**: espelha a `IndicativoAnbima` (linha mais recente com
+>   valor não-nulo, índice da PK, cache próprio `("spr", ticker)`). O histórico traz o spread **na
+>   mesma consulta** — zero consulta adicional.
+> - **Unidade: decimal, igual à taxa** (`_taxa_decimal`). Isso é coerente nos 3 casos e foi conferido
+>   na base: ref NTN-B/DI1 → spread em % a.a. (`-0.5193` → `-0,005193` = −51,93 bps); ref **`FUNDING`**
+>   → o spread **é a própria taxa indicativa** (CDI+ `0.6967` → `0,006967`; %CDI `102.9075` →
+>   `1,029075`, que formatado como % dá os 102,9% do CDI esperados).
+> - **Esparsidade é esperada, não bug:** só 42.853 das 136.070 linhas de `AnbimaIndicativos` têm
+>   spread (exige `cdReferencia` cadastrada + curva de MtM na data). Por isso a data do último spread
+>   pode ser **anterior** à da última taxa — as duas UDFs são consultas independentes, de propósito.
+> - **Novo `.xlam`: `CalcCP_v4.xlam`** (arquivo NOVO; v1, v2 e v3 intocados — mesma política de
+>   versão por arquivo do v2 e do v3). Por isso o `VERSION` do `.py` foi para **4.0.0**: o
+>   `gerar_bundle.py` deriva o nome do `.xlam` do **major** (`CalcCP_v{major}.xlam`), então é o major
+>   que precisa subir para nascer arquivo novo — um `3.1.0` teria SOBRESCRITO o v3.
+>   Fluxo usado: re-bake do `CalcCP_DEV.xlam` via COM → scrub de PII no `vbaProject.bin`
+>   (201.728 → 203.776 bytes) → transplante do `.bin` para uma cópia do **v3** (que já tem
+>   `%CALCCP_DIR%;Z:\CP` e `docProps` limpos). Verificado no arquivo final: 36 UDFs no `CodeModule`,
+>   `CallUDF("CalcCP")`, zip íntegro, 0 PII, `absPath` ausente, config preservada.
+> - **Quem ficar no v3 pega metade da mudança:** os `.py` valem para qualquer `.xlam` (o VBA só chama
+>   o Python), então a coluna `Spread` do histórico aparece no v3 também — só a UDF nova
+>   (`=cpAnbimaSpread`) exige o v4. Útil saber ao diagnosticar "no meu PC a coluna veio mas a fórmula
+>   dá `#NAME?`".
+
 > ## 🟢 ATUALIZAÇÃO 23/07/2026 — v3.0.0: `CalcCP_v3.xlam` + fórmulas ANBIMA lendo o `trades.db`
 > **3 UDFs novas (35 no total): `cpAnbimaRef`, `cpAnbimaIndicativo`, `cpAnbimaIndicativoHistorico`.**
 > São as **únicas** que não vêm de API — esses dados só existem na base do projeto de negociação

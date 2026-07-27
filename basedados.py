@@ -2,8 +2,9 @@
 # basedados.py — leitura do trades.db (projeto de negociação secundária)
 # -----------------------------------------------------------------------------
 # Única parte do add-in que lê uma base local. Serve às fórmulas ANBIMA
-# (=cpAnbimaRef, =cpAnbimaIndicativo, =cpAnbimaIndicativoHistorico), que
-# consultam dados que não existem em nenhuma API.
+# (=cpAnbimaRef, =cpAnbimaIndicativo, =cpAnbimaSpread,
+# =cpAnbimaIndicativoHistorico), que consultam dados que não existem em
+# nenhuma API.
 #
 # REGRAS:
 #   - SOMENTE LEITURA. A conexão é aberta com a URI `?mode=ro`, então o SQLite
@@ -16,7 +17,17 @@
 #
 # Tabelas usadas:
 #   InfoAtivos(cdTicker, cdReferencia, ...)                  — vértice de referência
-#   AnbimaIndicativos(cdTicker, dtReferencia, vrTaxaAnbima)  — indicativos publicados
+#   AnbimaIndicativos(cdTicker, dtReferencia, vrTaxaAnbima,  — indicativos publicados
+#                     vrSpreadAnbima)                          e o spread sobre a ref
+#
+# Sobre o SPREAD (vrSpreadAnbima): é calculado pelo projeto de negociação
+# secundária sobre a referência do papel, e vem na MESMA unidade da taxa
+# indicativa — por isso o CalcCP o converte para decimal do mesmo jeito:
+#   ref NTN-B/DI1 → spread em % a.a. sobre o vértice (ex.: -0.5193 = -51,93 bps);
+#   ref FUNDING   → é a própria taxa indicativa (CDI+ 0.6967 = CDI + 0,6967%;
+#                   %CDI 102.9075 = 102,9% do CDI) — não há benchmark externo.
+# É bem mais esparso que a taxa (só ~1/3 das linhas tem spread): depende de
+# o papel ter referência cadastrada e de haver curva de MtM na data.
 # =============================================================================
 
 import time
@@ -134,9 +145,33 @@ def IndicativoAnbima(ticker):
     return _Memo(("ind", ticker), _Buscar)
 
 
+def SpreadAnbima(ticker):
+    """Spread ANBIMA mais recente do papel: {'data', 'spread'} ou None.
+
+    `spread` vem como está na base, na mesma unidade da taxa indicativa (ex.:
+    -0.5193 = -51,93 bps sobre a NTN-B de referência). A data pode ser ANTERIOR
+    à de IndicativoAnbima: o spread só existe onde há referência e curva na data,
+    então a linha mais recente com taxa nem sempre tem spread."""
+    ticker = _Ticker(ticker)
+
+    def _Buscar():
+        linhas = _Consultar(
+            "SELECT dtReferencia, vrSpreadAnbima FROM AnbimaIndicativos "
+            "WHERE cdTicker = ? AND vrSpreadAnbima IS NOT NULL "
+            "ORDER BY dtReferencia DESC LIMIT 1",
+            (ticker,),
+        )
+        if not linhas:
+            return None
+        return {"data": linhas[0][0], "spread": float(linhas[0][1])}
+
+    return _Memo(("spr", ticker), _Buscar)
+
+
 def HistoricoIndicativoAnbima(ticker):
     """Histórico de indicativos do papel, do mais recente para o mais antigo:
-    lista de {'data', 'ticker', 'ref', 'taxa'} (vazia se não houver).
+    lista de {'data', 'ticker', 'ref', 'taxa', 'spread'} (vazia se não houver).
+    `spread` é None nas datas em que a base não tem spread calculado.
 
     A referência (`ref`) é a mesma em todas as linhas de um ticker, então em vez
     de um JOIN linha-a-linha com InfoAtivos, buscamos a `ref` uma única vez
@@ -146,15 +181,21 @@ def HistoricoIndicativoAnbima(ticker):
 
     def _Buscar():
         linhas = _Consultar(
-            "SELECT dtReferencia, vrTaxaAnbima FROM AnbimaIndicativos "
+            "SELECT dtReferencia, vrTaxaAnbima, vrSpreadAnbima FROM AnbimaIndicativos "
             "WHERE cdTicker = ? AND vrTaxaAnbima IS NOT NULL "
             "ORDER BY dtReferencia DESC",
             (ticker,),
         )
         ref = ReferenciaAnbima(ticker) or ""
         return [
-            {"data": data, "ticker": ticker, "ref": ref, "taxa": float(taxa)}
-            for data, taxa in linhas
+            {
+                "data": data,
+                "ticker": ticker,
+                "ref": ref,
+                "taxa": float(taxa),
+                "spread": None if spread is None else float(spread),
+            }
+            for data, taxa, spread in linhas
         ]
 
     return _Memo(("hist", ticker), _Buscar)

@@ -15,7 +15,7 @@ _EXCEL_EPOCH = date_type(1899, 12, 30)
 
 # Versão da lógica (.py). O .xlam é versionado por NOME de arquivo (CalcCP_vN.xlam);
 # a lógica aqui é retrocompatível (só adiciona UDF, nunca remove/renomeia) — ver CHANGELOG.md.
-VERSION = "3.0.1"
+VERSION = "4.0.0"
 
 # Todas as UDFs têm o prefixo cp (ex.: =cpPu, =cpTaxa, =cpVna...).
 # Títulos com API (debênture, CRI/CRA, NTN-B…): via B3 → FI Analytics → bondbuilder.
@@ -454,10 +454,33 @@ def cpAnbimaIndicativo(ticker):
 
 
 @xw.func
+def cpAnbimaSpread(ticker):
+    """Spread ANBIMA mais RECENTE disponível na base para o papel, sobre a
+    referência de =cpAnbimaRef, em DECIMAL (formate a célula como %; -0,5193%
+    = -51,93 bps). Fonte: trades.db (AnbimaIndicativos.vrSpreadAnbima).
+    Quando a referência é FUNDING (CDI+/%CDI) o spread É a própria taxa
+    indicativa — não há benchmark externo para descontar.
+    Devolve #N/A se o papel não tiver spread calculado (é mais esparso que a
+    taxa: exige referência cadastrada e curva de MtM na data).
+    (O histórico com as datas está em =cpAnbimaIndicativoHistorico.)"""
+    erro = _db_indisponivel()
+    if erro:
+        return erro
+    try:
+        spr = basedados.SpreadAnbima(ticker)
+        return _taxa_decimal(spr["spread"]) if spr else _NA
+    except basedados.BancoIndisponivel as e:
+        return f"ERRO: {e}"
+    except Exception as e:
+        return _erro("anbimaSpread", e)
+
+
+@xw.func
 def cpAnbimaIndicativoHistorico(ticker):
     """Histórico COMPLETO de indicativos ANBIMA do papel (spill), do mais recente
-    para o mais antigo: Data | Ticker | Ref | Taxa Indicativa.
-    Taxa em DECIMAL (formate a coluna como %). Fonte: trades.db."""
+    para o mais antigo: Data | Ticker | Ref | Taxa Indicativa | Spread.
+    Taxa e spread em DECIMAL (formate as colunas como %). Fonte: trades.db.
+    A coluna Spread sai #N/A nas datas sem spread calculado."""
     erro = _db_indisponivel()
     if erro:
         return erro
@@ -465,10 +488,12 @@ def cpAnbimaIndicativoHistorico(ticker):
         linhas = basedados.HistoricoIndicativoAnbima(ticker)
         if not linhas:
             return _NA
-        saida = [["Data", "Ticker", "Ref", "Taxa Indicativa"]]
+        saida = [["Data", "Ticker", "Ref", "Taxa Indicativa", "Spread"]]
         for l in linhas:
+            spread = l["spread"]
             saida.append([
                 _data_saida(l["data"]), l["ticker"], l["ref"], _taxa_decimal(l["taxa"]),
+                _NA if spread is None else _taxa_decimal(spread),
             ])
         return saida
     except basedados.BancoIndisponivel as e:
