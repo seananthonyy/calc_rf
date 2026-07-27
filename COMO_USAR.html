@@ -78,7 +78,19 @@
       <tr><td class="f">cpCdi</td><td>Quanto o CDI rendeu (fator) entre duas datas</td>
           <td><code>=cpCdi("02/01/2024";"30/12/2024";100)</code> → <span class="res">1,1077</span></td>
           <td class="src">B3</td></tr>
+      <tr><td class="f">cpFonteCalculo</td><td><b>De onde vem o cálculo</b> daquele papel
+          <span class="tag at">data e taxa opcionais</span></td>
+          <td><code>=cpFonteCalculo("FGEN13")</code> → <span class="res">B3</span><br>
+              <code>=cpFonteCalculo("CRA0210012Y")</code> → <span class="res">FI Analytics</span></td>
+          <td class="src">B3 / FI Analytics</td></tr>
     </table>
+    <p class="sub"><b>Sobre o <code>cpFonteCalculo</code>:</b> as fórmulas acima tentam as fontes em
+      ordem (B3 → FI Analytics → bondbuilder) e usam a primeira que responder. Essa fórmula diz qual
+      foi, para você auditar de onde saiu o número. Respostas possíveis: <code>B3</code>,
+      <code>FI Analytics</code>, <code>FI Analytics (bondbuilder)</code>, <code>DI (local)</code>
+      (contratos <code>DI1…</code>, que não têm API e são calculados aqui) e <code>#N/A</code>
+      (nenhuma fonte precifica o papel). A data e a taxa só são necessárias se o papel <b>já
+      venceu</b> — no resto do tempo é só <code>=cpFonteCalculo("TICKER")</code>.</p>
     <p class="sub">NTN-B usa B3 / FI Analytics, igual às debêntures. Já o DI futuro (<code>DI1F27</code>…) tem
       preço, taxa e duration de <b>cálculo próprio</b> (não vem de API).</p>
   </section>

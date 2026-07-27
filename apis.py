@@ -611,6 +611,27 @@ def TaxaOp(ticker, dataIso, pu):
     return None
 
 
+def FonteTicker(ticker):
+    """Fonte já conhecida do ticker ("b3"/"fi"/"bb"), ou None se ainda não sabemos.
+    Só lê o memo — nunca toca a rede, e por isso não precisa de data nem taxa."""
+    return _fonteTicker.get(str(ticker).upper().strip())
+
+
+def FonteCalculo(ticker, dataIso, taxa):
+    """Qual fonte precifica este ticker: "b3", "fi", "bb" ou None (nenhuma responde).
+
+    Se o memo já sabe (algum =cpPu/=cpTaxa/=cpDur já rodou para o papel nesta
+    sessão), devolve na hora, sem rede. Senão roda a MESMA cascata do Preco() —
+    então a resposta é sempre a fonte que de fato precificaria o papel, e não
+    depende da ordem em que o Excel calculou as células. `dataIso`/`taxa` só
+    servem para essa sondagem: qual das fontes responde não depende deles."""
+    tk = str(ticker).upper().strip()
+    memo = FonteTicker(tk)
+    if memo:
+        return memo
+    return _fonteTicker.get(tk) if Preco(tk, dataIso, taxa) else None
+
+
 # =============================================================================
 # DETALHES COMPLETOS DO PAPEL — pupar, VNA, fluxo, datas, gross up, etc.
 # -----------------------------------------------------------------------------

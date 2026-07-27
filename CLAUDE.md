@@ -4,6 +4,26 @@
 
 Documentação técnica para o Claude Code. Leia antes de alterar qualquer coisa nesta pasta.
 
+> ## 🟢 ATUALIZAÇÃO 27/07/2026 (2) — v4.1.0: `cpFonteCalculo` (37 UDFs) — v4 REGERADO
+> **UDF nova `cpFonteCalculo(ticker, [data], [taxa])`**: diz qual fonte precifica o papel —
+> `B3` / `FI Analytics` / `FI Analytics (bondbuilder)` / `DI (local)` / `#N/A`.
+>
+> - **A lógica ficou em `apis.FonteCalculo`**, ao lado da cascata que ela audita (`Preco`/`TaxaOp`) —
+>   de propósito: se ela vivesse na UDF, poderia divergir da ordem real das fontes. `apis.FonteTicker`
+>   é o par read-only (só lê o memo `_fonteTicker`, nunca toca a rede).
+> - **Determinística por decisão de design.** O memo sozinho responderia "não sei" para um ticker que
+>   ainda não foi precificado nesta sessão, e a resposta mudaria conforme o Excel calculasse a célula
+>   antes ou depois do `=cpPu` — inútil para auditoria. Então: memo se houver, **senão sonda com a
+>   mesma cascata**. A sondagem popula o memo, e as fórmulas seguintes herdam.
+> - **O memo é consultado ANTES de resolver data/taxa** (armadilha real, medida): `_resolve_taxa`
+>   chama `CampoBond` → `getBondDetails` → **rede**. Resolver antes de olhar o memo custava ~120 ms
+>   num caso que deveria ser 0,03 ms.
+> - **`CalcCP_v4.xlam` REGERADO no lugar** (37 UDFs, `.bin` 203.776 → 206.848 bytes), em vez de um v5:
+>   o v4.0.0 tinha sido publicado horas antes e **não fora instalado em nenhum PC** (confirmado com o
+>   usuário), então regerar evita uma 2ª re-registração do add-in. Vale como precedente: a política de
+>   arquivo-novo existe para não quebrar quem já usa — se ninguém usa ainda, ela não se aplica.
+>   O `.xlam` do v4.0.0 está no commit `40dacbb` se precisar.
+
 > ## 🟢 ATUALIZAÇÃO 27/07/2026 — v4.0.0: `CalcCP_v4.xlam` + `cpAnbimaSpread` (36 UDFs)
 > **1 UDF nova + 1 coluna nova**, na família ANBIMA (`basedados.py`, mesma exceção à regra 3):
 > `cpAnbimaSpread(ticker)` devolve o `AnbimaIndicativos.vrSpreadAnbima` mais recente do papel, e o

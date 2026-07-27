@@ -4,6 +4,38 @@ Versionamento: a **lógica** (`.py`) é retrocompatível; o **`.xlam` é version
 (`CalcCP_vN.xlam`) — versões antigas ficam na share e não quebram quem já usa.
 `VERSION` no `CalcCP.py` acompanha a lógica.
 
+## v4.1.0 — 2026-07-27 — `=cpFonteCalculo` (37 UDFs) — `CalcCP_v4.xlam` REGERADO
+
+> ⚠️ **O `CalcCP_v4.xlam` publicado horas antes (v4.0.0, 36 UDFs) foi substituído por este**, em vez
+> de virar um v5. Foi decisão consciente: o v4.0.0 ainda **não tinha sido instalado em nenhum PC**
+> (saiu do repositório para o banco no mesmo dia), então regerar o próprio v4 evita uma segunda
+> re-registração do add-in. Se você chegou a baixar o v4 antes desta linha existir, baixe de novo —
+> um v4 de 36 UDFs dá `#NAME?` no `=cpFonteCalculo`. `v1`, `v2` e `v3` seguem intocados.
+
+**1 fórmula nova (37 no total):**
+
+| Fórmula | Retorno |
+|---|---|
+| `=cpFonteCalculo(ticker; [data]; [taxa%])` | de onde vem o cálculo do papel: `B3`, `FI Analytics`, `FI Analytics (bondbuilder)` ou `DI (local)` |
+
+- **É auditoria da cascata, não uma fonte a mais.** `=cpPu`/`=cpTaxa`/`=cpDur` tentam B3 → FI →
+  bondbuilder e usam a primeira que responder; esta fórmula diz **qual foi**. A lógica ficou em
+  `apis.FonteCalculo`, ao lado da própria cascata, então as duas não podem divergir.
+- **Determinística, não depende da ordem de cálculo do Excel.** Se o `_fonteTicker` (memo por ticker)
+  já sabe, responde sem rede; se não sabe, **sonda com a mesma cascata** em vez de devolver "não sei".
+  Uma fórmula cuja resposta mudasse conforme a célula fosse calculada antes ou depois do `=cpPu`
+  seria inútil para auditoria.
+- **Caminho rápido de verdade:** o memo é consultado **antes** de resolver data/taxa — resolver a
+  taxa custaria uma ida à B3 (`getBondDetails`) só para descobrir algo que já sabíamos. Medido:
+  0,03 ms com o memo quente, contra ~120 ms se a resolução viesse primeiro.
+- **`data` e `taxa` são opcionais** e servem só para a sondagem — quem responde não depende delas.
+  Sem `data` usa hoje (informe a data se o papel **já venceu**); sem `taxa` usa a de emissão e, se o
+  papel não estiver no cadastro da B3, uma taxa neutra, para conseguir sondar a FI mesmo assim.
+- Validado ao vivo contra as duas fontes: `FGEN13`/`NTNB35` → `B3`; `CRA0210012Y`, `24I1419236`,
+  `CRA0190066O`, `26C5564546` (tickers que a base marca como precificados pela FI) → `FI Analytics`;
+  `DI1F27` → `DI (local)`; ticker inexistente → `#N/A`. O rótulo do **bondbuilder** não foi
+  exercitado ao vivo (cobre LCD/LF/CDB/CPF, que não aparecem na base de negociação secundária).
+
 ## v4.0.0 — 2026-07-27 — `CalcCP_v4.xlam`: `=cpAnbimaSpread` + coluna Spread no histórico
 
 **1 fórmula nova (36 no total)**, na mesma família das ANBIMA — vem do `trades.db`, não de API:

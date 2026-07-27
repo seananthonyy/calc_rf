@@ -15,7 +15,7 @@ _EXCEL_EPOCH = date_type(1899, 12, 30)
 
 # Versão da lógica (.py). O .xlam é versionado por NOME de arquivo (CalcCP_vN.xlam);
 # a lógica aqui é retrocompatível (só adiciona UDF, nunca remove/renomeia) — ver CHANGELOG.md.
-VERSION = "4.0.0"
+VERSION = "4.1.0"
 
 # Todas as UDFs têm o prefixo cp (ex.: =cpPu, =cpTaxa, =cpVna...).
 # Títulos com API (debênture, CRI/CRA, NTN-B…): via B3 → FI Analytics → bondbuilder.
@@ -24,7 +24,7 @@ VERSION = "4.0.0"
 _IMPORT_ERROR = None
 try:
     from apis import (
-        Preco, TaxaOp, LimparCache, FatorDi,
+        Preco, TaxaOp, LimparCache, FatorDi, FonteCalculo, FonteTicker,
         CampoBond, CampoFi, FluxoCadastrado, BcbValor, IpcaIndice,
     )
     import di
@@ -78,6 +78,10 @@ def _data_saida(iso):
 
 def _vazio(v) -> bool:
     return v is None or v == "" or (isinstance(v, float) and v != v)  # None/""/NaN
+
+
+# Resposta para "o dado não existe" (≠ "ERRO:", que é problema de ambiente).
+_NA = "#N/A"
 
 
 def _resolve_taxa(ticker, taxa) -> float:
@@ -182,6 +186,44 @@ def cpPu(ticker, data, taxa):
         return "ERRO: APIs sem resposta (B3/FI)"
     except Exception as e:
         return _erro("pu", e)
+
+
+_FONTE_ROTULO = {"b3": "B3", "fi": "FI Analytics", "bb": "FI Analytics (bondbuilder)"}
+_TAXA_SONDA = 10.0   # taxa qualquer, só para sondar quem responde (ver cpFonteCalculo)
+
+
+@xw.func
+@xw.arg('taxa', numbers=float)
+def cpFonteCalculo(ticker, data=None, taxa=None):
+    """De ONDE vem o cálculo do papel: "B3", "FI Analytics",
+    "FI Analytics (bondbuilder)" ou "DI (local)".
+
+    É a mesma cascata que =cpPu/=cpTaxa/=cpDur usam (B3 → FI → bondbuilder), então
+    responde a fonte que de fato precificaria o papel. Se alguma dessas fórmulas já
+    rodou para o ticker nesta sessão, sai do cache, sem rede.
+    `data` e `taxa` são OPCIONAIS e servem só para sondar quem responde (quem responde
+    não depende deles): sem `data` usa hoje — informe a data se o papel já venceu;
+    sem `taxa` usa a de emissão do papel e, se ela não existir, uma taxa qualquer.
+    Devolve #N/A se nenhuma fonte precifica o papel."""
+    if _IMPORT_ERROR:
+        return f"ERRO import: {_IMPORT_ERROR}"
+    try:
+        ticker = str(ticker).upper().strip()
+        if di.EhTickerDi(ticker):
+            return "DI (local)"
+        # Memo primeiro: se já sabemos, nem data nem taxa são necessárias — e
+        # resolver a taxa custaria uma ida à B3 (getBondDetails) à toa.
+        fonte = FonteTicker(ticker)
+        if not fonte:
+            dataIso = _data_iso(data) if not _vazio(data) else date_type.today().isoformat()
+            try:
+                taxaPct = _resolve_taxa(ticker, taxa)
+            except Exception:
+                taxaPct = _TAXA_SONDA   # fora do cadastro da B3: sonda a FI mesmo assim
+            fonte = FonteCalculo(ticker, dataIso, taxaPct)
+        return _FONTE_ROTULO.get(fonte, _NA)
+    except Exception as e:
+        return _erro("fonte", e)
 
 
 @xw.func
@@ -402,9 +444,6 @@ def cpAniversario(ticker):
 # As taxas saem em DECIMAL (7,5983% → 0,075983), como nas demais fórmulas de
 # taxa do add-in (=cpTaxa, =cpTaxaEmissao, =cpSelic) — formate a célula como %.
 # =============================================================================
-
-_NA = "#N/A"
-
 
 def _taxa_decimal(taxa):
     """% a.a. publicado → decimal, sem ruído de float (7,6411 → 0,076411)."""

@@ -154,6 +154,15 @@ ou a mensagem de que não foi encontrado (aí só as fórmulas `=cpAnbima…` fi
 | `=cpTaxa(ticker; data; pu)` | Taxa de negociação (decimal → formate como %) |
 | `=cpDur(ticker; data; taxa%)` | Duration de Macaulay em anos |
 | `=cpCdi(dataIni; dataFim; percentual)` | Fator de CDI acumulado (percentual = número puro, 100 = 100%) |
+| `=cpFonteCalculo(ticker; [data]; [taxa%])` | **De onde vem o cálculo** do papel: `B3`, `FI Analytics`, `FI Analytics (bondbuilder)` ou `DI (local)` |
+
+> **`=cpFonteCalculo` é auditoria da cascata**, não uma fonte a mais: responde quem, entre B3 → FI →
+> bondbuilder, de fato precifica aquele ticker — a mesma ordem que `=cpPu`/`=cpTaxa`/`=cpDur` usam.
+> Se alguma dessas fórmulas já rodou para o papel na sessão, a resposta sai **do cache, sem rede**;
+> senão ela sonda as fontes uma vez (e o resultado fica em cache para as demais fórmulas).
+> `data` e `taxa` são **opcionais** — servem só para a sondagem, e quem responde não depende delas:
+> sem `data` usa hoje (informe a data se o papel **já venceu**), sem `taxa` usa a de emissão.
+> `#N/A` = nenhuma fonte precifica o papel.
 
 ### Dados do papel (taxa OPCIONAL em PU Par/VNA/Fluxo — usa a de emissão se omitida)
 | Função | Retorno |
