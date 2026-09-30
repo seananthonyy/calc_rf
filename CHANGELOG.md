@@ -4,6 +4,31 @@ Versionamento: a **lógica** (`.py`) é retrocompatível; o **`.xlam` é version
 (`CalcCP_vN.xlam`) — versões antigas ficam na share e não quebram quem já usa.
 `VERSION` no `CalcCP.py` acompanha a lógica.
 
+## v5.0.0 — 2026-09-30 — `CalcCP_v5.xlam`: `=cpPupar` sem taxa e com FI Analytics de verdade
+
+**Arquivo NOVO `CalcCP_v5.xlam`** (v1…v4 intocados). Mesmas 37 fórmulas; o que mudou foi a
+**assinatura do `=cpPupar`**, e assinatura fica gravada no `.xlam` — por isso o arquivo novo.
+Inclui também as chaves da FI por produto da v4.1.1.
+
+- **`=cpPupar(ticker; data)` — o argumento `taxa` saiu.** O PU Par não depende da taxa (VNA + juros
+  do contrato; confirmado de novo: CRA0210012Y dá 1356,68314862 a 5% e a 12%), então pedir a taxa
+  só confundia. Por dentro a chamada usa a taxa de emissão da B3 quando existe e, senão, uma taxa
+  qualquer — só para montar a requisição.
+- **Agora pega o PU Par da FI Analytics de verdade.** Antes a FI já estava na cascata, mas na
+  prática o papel que não existe no cadastro da B3 (vários CRI/CRA) dava
+  `ERRO: informe a taxa…`, porque a fórmula ia buscar a taxa de emissão **na B3** antes de tentar
+  a FI. E se a B3 devolvesse o PU sem o PU Par, a fórmula parava ali. Nova `apis.PuPar`: cascata
+  B3 → FI → bondbuilder que só aceita uma fonte se ela trouxer o **PU Par**.
+  Validado ao vivo: `CRA0210012Y` → 1356,68314862 e `24I1419236` → 0,58697937 (ambos via FI);
+  `FGEN13` 13/06/2025 → 961,699883 via FI.
+- **Planilhas antigas não quebram.** Os `.py` valem para todos os `.xlam`, e v1…v4 continuam
+  mandando a taxa: o `cpPupar` aceita e **ignora** esse 3º argumento (`_IgnorarArgsExtras`). Quem
+  migrar para o v5 com `=cpPupar(t;d;taxa)` na planilha também não quebra — a taxa é descartada.
+- Migrar = desmarcar o v4 nos Suplementos e procurar o `CalcCP_v5.xlam`. Re-bake com o módulo
+  `xlwings_udfs` **removido antes** do `import_udfs` (que mescla); `.bin` 206.848 → 183.296 bytes
+  por isso. Verificado no arquivo final (aberto só-leitura): 37 UDFs, `cpPupar(ticker, data)`,
+  `CallUDF("CalcCP")`, zip íntegro, 0 PII, config `%CALCCP_DIR%;Z:\CP` preservada.
+
 ## v4.1.1 — 2026-09-30 — chaves da FI Analytics por produto (só lógica; **sem re-bake**, `.xlam` v4 inalterado)
 
 A FI Analytics passou a exigir **uma API key por produto** (Debêntures, CRIs/CRAs, Bond Builder); a

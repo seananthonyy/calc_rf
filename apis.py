@@ -614,6 +614,22 @@ def Preco(ticker, dataIso, taxa):
     return None
 
 
+def PuPar(ticker, dataIso, taxa):
+    """PU Par via B3→FI→bondbuilder (memo de fonte): a 1ª fonte que devolver o PU Par.
+
+    Diferente do Preco(), que para na 1ª fonte com PU: aqui uma fonte que precifica mas
+    não traz o PU Par cede a vez à próxima. O PU Par não depende da taxa (VNA + juros do
+    contrato), então `taxa` só serve para montar a chamada. float ou None."""
+    tk = str(ticker).upper().strip()
+    fontes = {"b3": PrecoB3, "fi": PrecoFi, "bb": PrecoBb}
+    for src in _OrdemFontes(tk, ["b3", "fi", "bb"]):
+        r = fontes[src](tk, dataIso, taxa)
+        if r and r.get("pupar") is not None:
+            _fonteTicker[tk] = src
+            return r["pupar"]
+    return None
+
+
 def TaxaOp(ticker, dataIso, pu):
     """Taxa (% a.a.) via B3→FI→bondbuilder com memo de fonte. float ou None."""
     tk = str(ticker).upper().strip()

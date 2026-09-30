@@ -1,3 +1,4 @@
+import functools
 import os
 import sys
 
@@ -15,7 +16,7 @@ _EXCEL_EPOCH = date_type(1899, 12, 30)
 
 # Versão da lógica (.py). O .xlam é versionado por NOME de arquivo (CalcCP_vN.xlam);
 # a lógica aqui é retrocompatível (só adiciona UDF, nunca remove/renomeia) — ver CHANGELOG.md.
-VERSION = "4.1.1"
+VERSION = "5.0.0"
 
 # Todas as UDFs têm o prefixo cp (ex.: =cpPu, =cpTaxa, =cpVna...).
 # Títulos com API (debênture, CRI/CRA, NTN-B…): via B3 → FI Analytics → bondbuilder.
@@ -24,7 +25,7 @@ VERSION = "4.1.1"
 _IMPORT_ERROR = None
 try:
     from apis import (
-        Preco, TaxaOp, LimparCache, FatorDi, FonteCalculo, FonteTicker,
+        Preco, PuPar, TaxaOp, LimparCache, FatorDi, FonteCalculo, FonteTicker,
         CampoBond, CampoFi, FluxoCadastrado, BcbValor, IpcaIndice,
     )
     import di
@@ -266,18 +267,36 @@ def cpDur(ticker, data, taxa):
 # DADOS DO PAPEL — PU Par, VNA, fluxo restante, datas, VNE (taxa opcional)
 # =============================================================================
 
+def _IgnorarArgsExtras(f):
+    """Deixa a UDF aceitar (e descartar) argumentos que ela JÁ TEVE em versões antigas.
+
+    Os `.py` são compartilhados por todos os `.xlam` (v1…vN): um `.xlam` antigo continua
+    passando o argumento removido. O wrapper corta o excesso antes de chamar a função;
+    o `__xlfunc__` (copiado pelo `wraps`) segue descrevendo só a assinatura nova, que é
+    o que o re-bake grava no `.xlam` novo."""
+    n = f.__code__.co_argcount
+
+    @functools.wraps(f)
+    def w(*args):
+        return f(*args[:n])
+    return w
+
+
+@_IgnorarArgsExtras
 @xw.func
-@xw.arg('taxa', numbers=float)
-def cpPupar(ticker, data, taxa=None):
-    """PU Par (valor nominal atualizado + juros acumulados) na data. taxa opcional
-    (pupar independe da taxa; se omitida usa a de emissão)."""
+def cpPupar(ticker, data):
+    """PU Par (valor nominal atualizado + juros acumulados) na data, via B3 → FI Analytics →
+    bondbuilder (a 1ª que devolver o PU Par). Não recebe taxa: o PU Par não depende dela."""
     if _IMPORT_ERROR:
         return f"ERRO import: {_IMPORT_ERROR}"
     try:
         ticker = str(ticker).upper().strip()
-        r = Preco(ticker, _data_iso(data), _resolve_taxa(ticker, taxa))
-        if r and r.get("pupar") is not None:
-            return float(r["pupar"])
+        # Só para montar a chamada (o PU Par não depende da taxa): a de emissão se a B3
+        # cadastra o papel; senão uma taxa qualquer, para a FI responder mesmo assim.
+        taxaPct = CampoBond(ticker, "yield")
+        pupar = PuPar(ticker, _data_iso(data), float(taxaPct) if taxaPct is not None else _TAXA_SONDA)
+        if pupar is not None:
+            return float(pupar)
         return "ERRO: PU Par indisponível (B3/FI)"
     except Exception as e:
         return _erro("pupar", e)

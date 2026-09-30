@@ -4,6 +4,18 @@
 
 Documentação técnica para o Claude Code. Leia antes de alterar qualquer coisa nesta pasta.
 
+> ## 🟢 ATUALIZAÇÃO 30/09/2026 — v5.0.0: `CalcCP_v5.xlam` — `cpPupar(ticker, data)` + chaves FI por produto
+> - **`cpPupar` perdeu o `taxa`** e usa a cascata própria `apis.PuPar` (B3 → FI → bondbuilder, exige o
+>   **PU Par** e não só o PU). A taxa da requisição é a de emissão (B3) ou `_TAXA_SONDA`.
+> - ⚠️ **Remover argumento de UDF sem quebrar os `.xlam` antigos:** os `.py` são compartilhados, e o
+>   v1…v4 continuam chamando com 3 args. `_IgnorarArgsExtras` (em `CalcCP.py`) embrulha a UDF **depois**
+>   do `@xw.func`: o `functools.wraps` copia o `__xlfunc__` (assinatura nova, que é o que o re-bake grava)
+>   e o wrapper corta os args excedentes. O `call_udf` do xlwings tolera args a mais
+>   (`args_info[min(i, len-1)]`). Use o mesmo padrão em qualquer remoção futura de argumento.
+> - **Chaves FI por produto** (v4.1.1): `token_fianalytics_deb`/`_cricra`/`_bb`, escolhidas em
+>   `apis._ChaveFi(path)`; fallback `token_fianalytics`. Em 30/09 deb e cricra OK ao vivo; a chave bb
+>   devolveu 403 (a antiga funciona no mesmo endpoint) — pendência com a FI/transcrição.
+
 > ## 🟢 ATUALIZAÇÃO 27/07/2026 (2) — v4.1.0: `cpFonteCalculo` (37 UDFs) — v4 REGERADO
 > **UDF nova `cpFonteCalculo(ticker, [data], [taxa])`**: diz qual fonte precifica o papel —
 > `B3` / `FI Analytics` / `FI Analytics (bondbuilder)` / `DI (local)` / `#N/A`.

@@ -41,7 +41,7 @@ em **somente leitura**. Datas aceitam `"dd/mm/aaaa"`, célula de data ou `HOJE()
    `.xlam` lê a pasta da variável de ambiente **`CALCCP_DIR`** (com fallback para `Z:\CP`,
    se a variável não estiver setada — ver [passo 2](#2-variáveis-de-ambiente-do-usuário-segredos--proxy--pasta)).
    Assim cada PC pode apontar para onde a pasta estiver (share com letra diferente, cópia local etc.).
-   Conteúdo mínimo da pasta: `CalcCP_v4.xlam`, `CalcCP.py`, `apis.py`, `di.py`, `basedados.py`,
+   Conteúdo mínimo da pasta: `CalcCP_v5.xlam`, `CalcCP.py`, `apis.py`, `di.py`, `basedados.py`,
    `config.py`, `feriados_anbima.csv`. Puxar do repositório do projeto (ou extrair o `CalcCP_bundle.py`).
 4. **(Só para as fórmulas ANBIMA) acesso de leitura ao `trades.db`** do projeto de negociação
    secundária. O add-in **descobre o arquivo sozinho** procurando a árvore
@@ -97,8 +97,8 @@ Excel → Opções → **Central de Confiabilidade** → Configurações de Macr
 
 ### 4. Habilitar o add-in
 Excel → Opções → **Suplementos** → "Suplementos do Excel" → **Ir...** → **Procurar** →
-selecionar `Z:\CP\CalcCP_v4.xlam` → OK. (Quem já usa o `CalcCP_v1.xlam`/`_v2.xlam`/`_v3.xlam`
-continua funcionando; migrar = desmarcar o antigo e procurar o v4. Os `.xlam` antigos **não são
+selecionar `Z:\CP\CalcCP_v5.xlam` → OK. (Quem já usa o `CalcCP_v1.xlam`…`_v4.xlam`
+continua funcionando; migrar = desmarcar o antigo e procurar o v5. Os `.xlam` antigos **não são
 tocados** — ficam na pasta do lado do novo. As fórmulas `=cpAnbima…` existem a partir do **v3**;
 o `=cpAnbimaSpread`, só no **v4**.)
 As UDFs já vêm **registradas** no `.xlam` (não precisa "Import Functions"). Aparece a aba
@@ -126,7 +126,7 @@ Esse arquivo é **por PC e por usuário** (não vai pro repositório).
 ### 6. Testar
 Feche e reabra o Excel:
 ```
-=cpTeste()                              -> OK v4.0.0 — path: Z:\CP — CALCCP_DIR=Z:\CP — trades.db: OK (ANBIMA até 2026-07-17) — ...
+=cpTeste()                              -> OK v5.0.0 — path: Z:\CP — CALCCP_DIR=Z:\CP — trades.db: OK (ANBIMA até 2026-07-17) — ...
 =cpPu("FGEN13"; "13/06/2025"; 6,4686%)  -> ~961,70
 =cpPu("DI1F27"; "01/07/2026"; 10%)      -> ~95310,20   (DI, cálculo local)
 =cpAnbimaRef("FGEN13")                  -> NTN-B 27    (leitura do trades.db)
@@ -170,7 +170,7 @@ ou a mensagem de que não foi encontrado (aí só as fórmulas `=cpAnbima…` fi
 ### Dados do papel (taxa OPCIONAL em PU Par/VNA/Fluxo — usa a de emissão se omitida)
 | Função | Retorno |
 |---|---|
-| `=cpPupar(ticker; data; [taxa%])` | PU Par (valor nominal atualizado + juros) |
+| `=cpPupar(ticker; data)` | PU Par (valor nominal atualizado + juros), B3 → FI Analytics → bondbuilder. **Sem taxa** desde o v5 (o PU Par não depende dela) |
 | `=cpVna(ticker; data; [taxa%])` | VNA — Valor Nominal Atualizado |
 | `=cpFluxo(ticker; data; [taxa%])` | Agenda **RESTANTE** a partir da data (spill): Data · Tipo · %Amort · %Incorp |
 | `=cpFluxoCompleto(ticker)` | Agenda **INTEIRA**, desde a emissão (spill): Data · %Amort · %Incorp |
@@ -301,8 +301,8 @@ renomeia** (senão quebra planilhas e `.xlam` antigos). O **`.xlam` é versionad
 | fórmulas não calculam, PC com vários Python | add-in pegou o Python errado | passo 5 (fixar `Interpreter`) |
 | `ERRO: APIs sem resposta (B3/FI)` | faltam env vars / proxy | passo 2 |
 | `ERRO: trades.db não encontrado` nas `=cpAnbima…` | base fora do layout esperado (ou share não mapeada) | setar `TRADES_DB_PATH` com o caminho completo do arquivo (passo 2) e `=cpLimparCache()` |
-| `#NAME?` só nas `=cpAnbima…` | add-in registrado é o `_v1`/`_v2` (não têm essas fórmulas) | registrar o `CalcCP_v4.xlam` (passo 4) |
-| `#NAME?` só em `=cpAnbimaSpread` (as outras `=cpAnbima…` funcionam) | add-in registrado é o `_v3` — a UDF nova só existe no v4 | registrar o `CalcCP_v4.xlam` (passo 4). A coluna Spread do histórico já funciona no v3, porque depende só dos `.py` |
+| `#NAME?` só nas `=cpAnbima…` | add-in registrado é o `_v1`/`_v2` (não têm essas fórmulas) | registrar o `CalcCP_v5.xlam` (passo 4) |
+| `#NAME?` só em `=cpAnbimaSpread` (as outras `=cpAnbima…` funcionam) | add-in registrado é o `_v3` — a UDF nova só existe no v4 | registrar o `CalcCP_v5.xlam` (passo 4). A coluna Spread do histórico já funciona no v3, porque depende só dos `.py` |
 | `Input past end of file` | `myaddin.conf` com linha em branco sobrando | recriar com o snippet do passo 5 |
 | aba não aparece / `#NAME?` | add-in não habilitado ou VBA não liberado | passos 3 e 4 |
 | Excel congela/pisca em planilha do SharePoint | resolução de URL do PYTHONPATH / write-back de UDF assíncrona | já mitigado no `.xlam` (config + UDFs síncronas); paliativo: cálculo Manual/F9. Ver `CLAUDE.md` |
