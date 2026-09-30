@@ -32,7 +32,11 @@ from config import ENV_PATH
 # Nomes das variáveis de ambiente (definidas no banco). O add-in lê os segredos
 # daqui em produção; o .env serve só como fallback de desenvolvimento local.
 ENV_TOKEN_B3 = "token_calc_b3"
-ENV_KEY_FI   = "token_fianalytics"
+ENV_KEY_FI   = "token_fianalytics"          # chave única antiga (FI desativa em 30/09/2026) — só fallback
+# Desde set/2026 a FI exige uma chave POR PRODUTO. Cada endpoint lê a sua; sem ela, cai na antiga.
+ENV_KEY_FI_DEB = "token_fianalytics_deb"      # Debêntures   (/deb)
+ENV_KEY_FI_CR  = "token_fianalytics_cricra"   # CRIs/CRAs    (/cr)
+ENV_KEY_FI_BB  = "token_fianalytics_bb"       # Bond Builder (/bb)
 ENV_USER_FI  = "user_fianalytics"   # e-mail p/ getuserbonds do bondbuilder (fallback: FIANALYTICS_USER)
 
 # Proxy — env vars com a URL completa, incluindo usuário/senha, no formato
@@ -369,9 +373,20 @@ def FatorDi(dataInicioIso, dataFimIso, percentual=100.0):
 # FI Analytics
 # -----------------------------------------------------------------------------
 
+def _ChaveFi(path):
+    """API key do produto FI dono do endpoint (1ª parte do path); fallback = chave única antiga."""
+    produto = path.strip("/").split("/")[0]
+    especifica = {
+        "deb": (ENV_KEY_FI_DEB, "FIANALYTICS_API_KEY_DEB"),
+        "cr":  (ENV_KEY_FI_CR,  "FIANALYTICS_API_KEY_CRICRA"),
+        "bb":  (ENV_KEY_FI_BB,  "FIANALYTICS_API_KEY_BB"),
+    }.get(produto)
+    return (especifica and _Cred(*especifica)) or _Cred(ENV_KEY_FI, "FIANALYTICS_API_KEY")
+
+
 def _PostFi(corpo, path=FI_DEB_PATH):
     """POST num endpoint FI. Resposta é double-encoded. dict ou None."""
-    chave = _Cred(ENV_KEY_FI, "FIANALYTICS_API_KEY")
+    chave = _ChaveFi(path)
     if not chave:
         return None
     try:
@@ -459,7 +474,7 @@ def _PostFiRaw(path, corpo):
     title-caseia todo header ('X-Api-Key') e o gateway devolve 502. O http.client
     preserva a caixa. Suporta o proxy do banco (CONNECT tunnel c/ Proxy-Authorization).
     Retorna dict/list (double-encoded resolvido) ou None."""
-    chave = _Cred(ENV_KEY_FI, "FIANALYTICS_API_KEY")
+    chave = _ChaveFi(path)
     if not chave:
         return None
     corpoBytes = json.dumps(corpo).encode()

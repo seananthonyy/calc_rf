@@ -186,7 +186,10 @@ Depois de instalado, a aba do ribbon aparece como **CalcCP**.
 | Para | Variável de ambiente | Fallback `.env` (dev) |
 |---|---|---|
 | Token B3 Calculator | `token_calc_b3` | `B3_CALC_TOKEN` |
-| API key FI Analytics | `token_fianalytics` | `FIANALYTICS_API_KEY` |
+| API key FI — Debêntures (`/deb`) | `token_fianalytics_deb` | `FIANALYTICS_API_KEY_DEB` |
+| API key FI — CRIs/CRAs (`/cr`) | `token_fianalytics_cricra` | `FIANALYTICS_API_KEY_CRICRA` |
+| API key FI — Bond Builder (`/bb`) | `token_fianalytics_bb` | `FIANALYTICS_API_KEY_BB` |
+| API key FI antiga (única, fallback) | `token_fianalytics` | `FIANALYTICS_API_KEY` |
 | Proxy HTTP | `proxy_http` | (sem proxy = direto) |
 | Proxy HTTPS | `proxy_https` | (idem) |
 
@@ -204,7 +207,9 @@ Depois de instalado, a aba do ribbon aparece como **CalcCP**.
   via `_NormalizarTicker` antes de chamar a B3 (`NTNB35`/`NTN-B 35` → `76019920350515`; ano par→
   ago/15, ímpar→mai/15; `NTNF27` → `95019920270101`). Código cetip já pronto passa inalterado.
   Validado: B3 e FI gov dão o MESMO PU (NTNB35 @7% = 4486,066906).
-- **FI Analytics**: `POST` com header `x-api-key: <token_fianalytics>`. Dois endpoints com a MESMA
+- **FI Analytics**: `POST` com header `x-api-key: <chave do produto>` — desde 30/09/2026 a FI exige
+  **uma chave por produto**; `_ChaveFi(path)` escolhe pelo 1º segmento do path (`deb`/`cr`/`bb`) e cai
+  na `token_fianalytics` antiga se a do produto não estiver setada. Dois endpoints com a MESMA
   resposta: `/deb/debenturecalculator` (debêntures) e `/cr/cricracalculator` (CRI/CRA). O `apis.py`
   tenta o de debênture e, se não vier resultado (ex.: ticker é CRA), tenta o de CRI/CRA
   (`_PostFiAuto`). Resposta é **double-encoded** (JSON dentro de string). Modo `rate` →

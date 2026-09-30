@@ -4,6 +4,19 @@ Versionamento: a **lógica** (`.py`) é retrocompatível; o **`.xlam` é version
 (`CalcCP_vN.xlam`) — versões antigas ficam na share e não quebram quem já usa.
 `VERSION` no `CalcCP.py` acompanha a lógica.
 
+## v4.1.1 — 2026-09-30 — chaves da FI Analytics por produto (só lógica; **sem re-bake**, `.xlam` v4 inalterado)
+
+A FI Analytics passou a exigir **uma API key por produto** (Debêntures, CRIs/CRAs, Bond Builder); a
+chave única antiga deixa de funcionar em **30/09/2026**. Nenhuma fórmula mudou.
+
+- **Variáveis de ambiente novas** (usuário, sem admin): `token_fianalytics_deb`,
+  `token_fianalytics_cricra`, `token_fianalytics_bb`. O add-in escolhe a chave pelo endpoint chamado
+  (`apis._ChaveFi`): `/deb` → deb, `/cr` → cricra, `/bb` (cálculo e `getuserbonds`) → bb.
+- **Fallback:** sem a chave do produto, usa a `token_fianalytics` antiga — dá pra atualizar os `.py`
+  antes de setar as variáveis sem quebrar nada (enquanto a antiga valer).
+- A chave de **Títulos Públicos** da FI não é usada: o add-in precifica título público pela B3.
+- Atualizar = baixar o `CalcCP_bundle.py`, rodar, setar as 3 variáveis (`setx`) e **reiniciar o Excel**.
+
 ## v4.1.0 — 2026-07-27 — `=cpFonteCalculo` (37 UDFs) — `CalcCP_v4.xlam` REGERADO
 
 > ⚠️ **O `CalcCP_v4.xlam` publicado horas antes (v4.0.0, 36 UDFs) foi substituído por este**, em vez
