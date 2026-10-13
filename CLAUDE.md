@@ -4,6 +4,12 @@
 
 Documentação técnica para o Claude Code. Leia antes de alterar qualquer coisa nesta pasta.
 
+> ## 🟢 ATUALIZAÇÃO 13/10/2026 — v5.0.1: bondbuilder em `/userdefinedbond/bondcalculator` (só `.py`)
+> - Corpo `{user_email, bond_name, date, settlement_date, useIntradayCurve, rate|pu}`; sem
+>   `getuserbonds`/`doc_id`. Chave `token_fianalytics_bond_builder` → fallback `_bb` → antiga.
+> - **Fora da rede do Itaú o gateway devolve 403 (`ForbiddenException`) no Bond Builder** mesmo com
+>   chave válida e o script de referência do usuário — testar só no banco. `/deb` e `/cr` respondem de fora.
+
 > ## 🟢 ATUALIZAÇÃO 30/09/2026 — v5.0.0: `CalcCP_v5.xlam` — `cpPupar(ticker, data)` + chaves FI por produto
 > - **`cpPupar` perdeu o `taxa`** e usa a cascata própria `apis.PuPar` (B3 → FI → bondbuilder, exige o
 >   **PU Par** e não só o PU). A taxa da requisição é a de emissão (B3) ou `_TAXA_SONDA`.
@@ -200,7 +206,7 @@ Depois de instalado, a aba do ribbon aparece como **CalcCP**.
 | Token B3 Calculator | `token_calc_b3` | `B3_CALC_TOKEN` |
 | API key FI — Debêntures (`/deb`) | `token_fianalytics_deb` | `FIANALYTICS_API_KEY_DEB` |
 | API key FI — CRIs/CRAs (`/cr`) | `token_fianalytics_cricra` | `FIANALYTICS_API_KEY_CRICRA` |
-| API key FI — Bond Builder (`/bb`) | `token_fianalytics_bb` | `FIANALYTICS_API_KEY_BB` |
+| API key FI — Bond Builder (`/userdefinedbond`) | `token_fianalytics_bond_builder` (fallback `token_fianalytics_bb`) | `FIANALYTICS_API_KEY_BB` |
 | API key FI antiga (única, fallback) | `token_fianalytics` | `FIANALYTICS_API_KEY` |
 | Proxy HTTP | `proxy_http` | (sem proxy = direto) |
 | Proxy HTTPS | `proxy_https` | (idem) |
@@ -220,7 +226,7 @@ Depois de instalado, a aba do ribbon aparece como **CalcCP**.
   ago/15, ímpar→mai/15; `NTNF27` → `95019920270101`). Código cetip já pronto passa inalterado.
   Validado: B3 e FI gov dão o MESMO PU (NTNB35 @7% = 4486,066906).
 - **FI Analytics**: `POST` com header `x-api-key: <chave do produto>` — desde 30/09/2026 a FI exige
-  **uma chave por produto**; `_ChaveFi(path)` escolhe pelo 1º segmento do path (`deb`/`cr`/`bb`) e cai
+  **uma chave por produto**; `_ChaveFi(path)` escolhe pelo 1º segmento do path (`deb`/`cr`/`userdefinedbond`) e cai
   na `token_fianalytics` antiga se a do produto não estiver setada. Dois endpoints com a MESMA
   resposta: `/deb/debenturecalculator` (debêntures) e `/cr/cricracalculator` (CRI/CRA). O `apis.py`
   tenta o de debênture e, se não vier resultado (ex.: ticker é CRA), tenta o de CRI/CRA
@@ -248,12 +254,12 @@ Depois de instalado, a aba do ribbon aparece como **CalcCP**.
 - **Token B3** obtido 1×, reusado, renova em 401.
 - `=LIMPARCACHE()` limpa tudo: memória, disco, breaker, memo e token.
 - **Bondbuilder** (3º fallback, `PrecoBb`/`TaxaBb`): p/ papéis fora de `/deb` e `/cr` (ex.: LCD, LF,
-  CDB, CPF). 2 passos — `getuserbonds` (cacheado 1×/processo, casa `bond_name`==ticker → `doc_id`) e
-  `/bb/bondbuildercalculator`. É **simétrico** como o `/deb`: manda `rate`→volta `m2m` (PU)+`maculayDuration`;
+  CDB, CPF). Rota única `POST /userdefinedbond/bondcalculator`, corpo `{user_email, bond_name (=ticker),
+  date, settlement_date (=date), useIntradayCurve: true, rate|pu}` (`_CorpoBb`/`_PostBb`). É **simétrico** como o `/deb`: manda `rate`→volta `m2m` (PU)+`maculayDuration`;
   manda `pu`→volta `m2mRate`. Cobre `=PU`/`=DUR`/`=TAXA`. Exige a env var **`user_fianalytics`** (e-mail;
   fallback `.env` = `FIANALYTICS_USER`). ⚠️ Usa `http.client` (não urllib) via `_PostFiRaw`: o WAF do
-  `/bb` exige o header `x-api-key` em **minúsculo** e o urllib title-caseia → 502. `_PostFiRaw` também
-  faz o proxy (CONNECT tunnel). Só dispara depois de B3 e FI falharem (custa 1 `getuserbonds`).
+  bondbuilder exige o header `x-api-key` em **minúsculo** e o urllib title-caseia → 502. `_PostFiRaw` também
+  faz o proxy (CONNECT tunnel). Só dispara depois de B3 e FI falharem.
 
 ## Como ALTERAR (fluxo de trabalho)
 

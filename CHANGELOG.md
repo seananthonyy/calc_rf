@@ -4,6 +4,23 @@ Versionamento: a **lógica** (`.py`) é retrocompatível; o **`.xlam` é version
 (`CalcCP_vN.xlam`) — versões antigas ficam na share e não quebram quem já usa.
 `VERSION` no `CalcCP.py` acompanha a lógica.
 
+## v5.0.1 — 2026-10-13 — bondbuilder na rota certa (só lógica; **sem re-bake**, `CalcCP_v5.xlam` inalterado)
+
+O fallback **bondbuilder** (3ª fonte da cascata B3 → FI → bondbuilder, para papéis fora de `/deb` e
+`/cr`) chamava uma rota que não serve mais e nunca respondia. Nenhuma fórmula mudou.
+
+- **Rota nova:** `POST /userdefinedbond/bondcalculator` (antes `/bb/bondbuildercalculator`).
+- **O papel vai pelo nome:** o corpo leva `user_email`, `bond_name` (= ticker), `date`,
+  `settlement_date` (= `date`), `useIntradayCurve: true` e `rate` (ou `pu`). Saiu o passo
+  `getuserbonds` → `doc_id`, que não existe nessa rota.
+- **Chave:** `token_fianalytics_bond_builder` (o nome usado no banco). Sem ela, cai na
+  `token_fianalytics_bb` e depois na antiga `token_fianalytics`. Continua exigindo `user_fianalytics`.
+- ⚠️ **Validado só no formato, não ao vivo:** a chamada é idêntica à do script de teste que funciona
+  no banco, mas fora da rede do Itaú o gateway da FI devolve 403 para o Bond Builder (com a mesma
+  chave e o mesmo script) — conferir no banco. O modo PU → taxa (`pu` no lugar de `rate`) segue por
+  simetria com o `/deb`, não foi confirmado.
+- Atualizar = baixar o `CalcCP_bundle.py`, rodar e **reiniciar o Excel**. Vale para todos os `.xlam`.
+
 ## v5.0.0 — 2026-09-30 — `CalcCP_v5.xlam`: `=cpPupar` sem taxa e com FI Analytics de verdade
 
 **Arquivo NOVO `CalcCP_v5.xlam`** (v1…v4 intocados). Mesmas 37 fórmulas; o que mudou foi a

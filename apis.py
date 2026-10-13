@@ -36,8 +36,9 @@ ENV_KEY_FI   = "token_fianalytics"          # chave única antiga (FI desativa e
 # Desde set/2026 a FI exige uma chave POR PRODUTO. Cada endpoint lê a sua; sem ela, cai na antiga.
 ENV_KEY_FI_DEB = "token_fianalytics_deb"      # Debêntures   (/deb)
 ENV_KEY_FI_CR  = "token_fianalytics_cricra"   # CRIs/CRAs    (/cr)
-ENV_KEY_FI_BB  = "token_fianalytics_bb"       # Bond Builder (/bb)
-ENV_USER_FI  = "user_fianalytics"   # e-mail p/ getuserbonds do bondbuilder (fallback: FIANALYTICS_USER)
+ENV_KEY_FI_BB  = "token_fianalytics_bond_builder"  # Bond Builder (/userdefinedbond)
+ENV_KEY_FI_BB_ANTIGA = "token_fianalytics_bb"     # nome antigo da mesma chave — só fallback
+ENV_USER_FI  = "user_fianalytics"   # e-mail do usuário FI, vai no corpo do bondbuilder (fallback: FIANALYTICS_USER)
 
 # Proxy — env vars com a URL completa, incluindo usuário/senha, no formato
 # http://USUARIO:SENHA@HOST:PORTA. Ausentes (dev) → conexão direta.
@@ -48,8 +49,7 @@ B3_BASE      = "https://api.calculadorarendafixa.com.br"
 FI_BASE      = "https://endpoint.fi-analytics.com.br"
 FI_DEB_PATH  = "/deb/debenturecalculator"
 FI_CR_PATH   = "/cr/cricracalculator"   # CRI/CRA (mesmos campos da resposta)
-FI_BB_PATH       = "/bb/bondbuildercalculator"             # fallback: papéis fora de /deb e /cr
-FI_BB_BONDS_PATH = "/bb/bondbuildercalculator/getuserbonds"
+FI_BB_PATH   = "/userdefinedbond/bondcalculator"   # bondbuilder: papéis fora de /deb e /cr
 TIMEOUT_SEG  = 6  # timeout curto por chamada para não travar o Excel
 
 # Cache em disco (persiste entre reaberturas do Excel): só resultados VÁLIDOS
@@ -118,8 +118,6 @@ _opener = _ConstruirOpener()
 _tokenB3 = None
 _cacheRespostas: dict = {}
 _fonteTicker: dict = {}   # ticker(upper) -> "b3"|"fi"|"bb": qual fonte respondeu (memo)
-_userBonds = None         # cache 1x/processo do getuserbonds: lista de {bond_name,_id} ou None
-_userBondsBuscado = False
 
 # Espelho em memória do cache de disco: chaveStr -> {"k":list, "v":valor, "t":ts}.
 # Carregado 1× no import; sincronizado com o arquivo só nos flushes (não a cada set).
@@ -208,15 +206,13 @@ def _Abrir(req, base=None):
 
 
 def LimparCache():
-    """Esvazia o cache (memória+disco), o token, o memo e os bonds."""
-    global _tokenB3, _userBonds, _userBondsBuscado, _discoSujo
+    """Esvazia o cache (memória+disco), o token e o memo."""
+    global _tokenB3, _discoSujo
     _cacheRespostas.clear()
     _fonteTicker.clear()
     _discoRegistro.clear()
     _discoSujo = False
     _tokenB3 = None
-    _userBonds = None
-    _userBondsBuscado = False
     try:
         os.remove(_CACHE_FILE)
     except OSError:
@@ -379,8 +375,11 @@ def _ChaveFi(path):
     especifica = {
         "deb": (ENV_KEY_FI_DEB, "FIANALYTICS_API_KEY_DEB"),
         "cr":  (ENV_KEY_FI_CR,  "FIANALYTICS_API_KEY_CRICRA"),
-        "bb":  (ENV_KEY_FI_BB,  "FIANALYTICS_API_KEY_BB"),
+        "userdefinedbond": (ENV_KEY_FI_BB, "FIANALYTICS_API_KEY_BB"),
     }.get(produto)
+    if produto == "userdefinedbond":
+        return (_Cred(*especifica) or os.getenv(ENV_KEY_FI_BB_ANTIGA)
+                or _Cred(ENV_KEY_FI, "FIANALYTICS_API_KEY"))
     return (especifica and _Cred(*especifica)) or _Cred(ENV_KEY_FI, "FIANALYTICS_API_KEY")
 
 
@@ -462,15 +461,15 @@ def TaxaFi(ticker, dataIso, pu):
 # -----------------------------------------------------------------------------
 # FI Analytics — bondbuilder (fallback p/ papéis fora de /deb e /cr)
 # -----------------------------------------------------------------------------
-# Mesmo motor da FI, mas o papel é endereçado por doc_id (de getuserbonds), não
-# por ticker. É SIMÉTRICO como o /deb: manda `rate` → volta `m2m` (PU) + duration;
-# manda `pu` → volta `m2mRate`. Exige o e-mail do usuário (ENV_USER_FI) e uma
-# chamada getuserbonds (cacheada 1x/processo). Só dispara depois de B3 e FI falharem.
+# Rota única POST /userdefinedbond/bondcalculator. O papel vai pelo NOME
+# (`bond_name` = ticker) junto com o e-mail do usuário (ENV_USER_FI) — sem passo
+# de descoberta de id. Mesmo motor da FI: manda `rate` → volta `m2m` (PU) +
+# duration; manda `pu` → volta `m2mRate`. Só dispara depois de B3 e FI falharem.
 
 def _PostFiRaw(path, corpo):
     """POST num endpoint FI via http.client (NÃO via urllib).
 
-    Motivo: o WAF do /bb exige o header 'x-api-key' em MINÚSCULO; o urllib.request
+    Motivo: o WAF do bondbuilder exige o header 'x-api-key' em MINÚSCULO; o urllib.request
     title-caseia todo header ('X-Api-Key') e o gateway devolve 502. O http.client
     preserva a caixa. Suporta o proxy do banco (CONNECT tunnel c/ Proxy-Authorization).
     Retorna dict/list (double-encoded resolvido) ou None."""
@@ -478,7 +477,7 @@ def _PostFiRaw(path, corpo):
     if not chave:
         return None
     corpoBytes = json.dumps(corpo).encode()
-    headers = {"content-type": "application/json; charset=utf-8", "x-api-key": chave}
+    headers = {"content-type": "application/json; charset=utf-8", "accept": "*/*", "x-api-key": chave}
     host = urlparse(FI_BASE).hostname
     proxy = os.getenv(ENV_PROXY_HTTPS)
     conn = None
@@ -511,32 +510,23 @@ def _PostFiRaw(path, corpo):
         return None
 
 
-def _ObterBonds():
-    """getuserbonds (cacheado 1x/processo). Lista de {bond_name,_id} ou None."""
-    global _userBonds, _userBondsBuscado
-    if _userBondsBuscado:
-        return _userBonds
-    _userBondsBuscado = True
+def _CorpoBb(ticker, dataIso, campo, valor):
+    """Corpo do bondbuilder, ou None sem o e-mail do usuário (a rota exige)."""
     email = _Cred(ENV_USER_FI, "FIANALYTICS_USER")
-    if email:
-        dados = _PostFiRaw(FI_BB_BONDS_PATH, {"user_email": email, "get_company_bonds": "1"})
-        if isinstance(dados, dict):
-            dados = dados.get("data") or dados.get("bonds")
-        if isinstance(dados, list):
-            _userBonds = dados
-    return _userBonds
-
-
-def _AcharDocId(ticker):
-    """doc_id do bond cujo bond_name == ticker (case-insensitive), ou None."""
-    bonds = _ObterBonds()
-    if not bonds:
+    if not email:
         return None
-    alvo = str(ticker).upper().strip()
-    for b in bonds:
-        if str(b.get("bond_name", "")).upper().strip() == alvo:
-            return b.get("_id")
-    return None
+    return {"user_email": email, "bond_name": str(ticker).upper().strip(),
+            "date": dataIso, "settlement_date": dataIso,
+            "useIntradayCurve": True, campo: float(valor)}
+
+
+def _PostBb(ticker, dataIso, campo, valor):
+    """Chama o bondbuilder (`campo` = "rate" ou "pu"). dict sem erro ou None."""
+    corpo = _CorpoBb(ticker, dataIso, campo, valor)
+    if corpo is None:
+        return None
+    dados = _PostFiRaw(FI_BB_PATH, corpo)
+    return dados if _BbOk(dados) else None
 
 
 def _BbOk(dados):
@@ -553,21 +543,19 @@ def PrecoBb(ticker, dataIso, taxa):
         return cacheado
 
     resultado = None
-    docId = _AcharDocId(ticker)
-    if docId:
-        dados = _PostFiRaw(FI_BB_PATH, {"doc_id": docId, "date": dataIso, "rate": float(taxa)})
-        if _BbOk(dados):
-            pu    = dados.get("m2m")
-            dur   = dados.get("maculayDuration")
-            pupar = dados.get("currentNotionalPlusAccruedInterest")
-            vna   = dados.get("adjustedFaceValue")
-            if pu is not None and float(pu) > 0:
-                resultado = {
-                    "pu": float(pu),
-                    "duration": float(dur) if dur is not None else None,
-                    "pupar": float(pupar) if pupar is not None else None,
-                    "vna": float(vna) if vna is not None else None,
-                }
+    dados = _PostBb(ticker, dataIso, "rate", taxa)
+    if dados:
+        pu    = dados.get("m2m")
+        dur   = dados.get("maculayDuration")
+        pupar = dados.get("currentNotionalPlusAccruedInterest")
+        vna   = dados.get("adjustedFaceValue")
+        if pu is not None and float(pu) > 0:
+            resultado = {
+                "pu": float(pu),
+                "duration": float(dur) if dur is not None else None,
+                "pupar": float(pupar) if pupar is not None else None,
+                "vna": float(vna) if vna is not None else None,
+            }
     _CacheSet(chaveCache, resultado)
     return resultado
 
@@ -581,13 +569,11 @@ def TaxaBb(ticker, dataIso, pu):
         return cacheado
 
     resultado = None
-    docId = _AcharDocId(ticker)
-    if docId:
-        dados = _PostFiRaw(FI_BB_PATH, {"doc_id": docId, "date": dataIso, "pu": float(pu)})
-        if _BbOk(dados):
-            taxa = dados.get("m2mRate")
-            if taxa is not None and float(taxa) > 0:
-                resultado = float(taxa) * 100
+    dados = _PostBb(ticker, dataIso, "pu", pu)
+    if dados:
+        taxa = dados.get("m2mRate")
+        if taxa is not None and float(taxa) > 0:
+            resultado = float(taxa) * 100
     _CacheSet(chaveCache, resultado)
     return resultado
 
@@ -595,7 +581,7 @@ def TaxaBb(ticker, dataIso, pu):
 # ─── roteamento B3 → FI → bondbuilder com memo de fonte por ticker ───────────
 # Tenta as fontes em ordem; a que respondeu (só em sucesso) é memorizada e passa
 # a ser tentada 1º nas próximas — mas o fallback é SEMPRE mantido (o memo só
-# reordena, nunca bloqueia). bondbuilder fica por último (custa 1 getuserbonds).
+# reordena, nunca bloqueia). bondbuilder fica por último.
 
 def _OrdemFontes(tk, todas):
     memo = _fonteTicker.get(tk)
@@ -770,7 +756,7 @@ def _FiFull(ticker, dataIso, taxa):
     """Resposta COMPLETA da FI (modo rate), via /deb, /cr ou bondbuilder, ou None.
 
     Mesma cadeia de fontes do `Preco`/`TaxaOp`: papel que só existe no bondbuilder (LCD, LF, CDB...)
-    não é conhecido pelo /deb nem pelo /cr, mas o /bb devolve os MESMOS campos (m2m, taxedM2MRate,
+    não é conhecido pelo /deb nem pelo /cr, mas o bondbuilder devolve os MESMOS campos (m2m, taxedM2MRate,
     taxedType, dv01...) — é o que faz cpGrossUp/cpGrossUpTipo/cpDv01 funcionarem nesses papéis."""
     taxa = _Norm(taxa)
     chave = ("fifull", str(ticker).upper().strip(), dataIso, taxa)
@@ -787,11 +773,7 @@ def _FiFull(ticker, dataIso, taxa):
 
 def _BbFull(ticker, dataIso, taxa):
     """Resposta COMPLETA do bondbuilder (modo rate) ou None."""
-    docId = _AcharDocId(ticker)
-    if not docId:
-        return None
-    dados = _PostFiRaw(FI_BB_PATH, {"doc_id": docId, "date": dataIso, "rate": float(taxa)})
-    return dados if _BbOk(dados) else None
+    return _PostBb(ticker, dataIso, "rate", taxa)
 
 
 def _FluxoFi(f):
