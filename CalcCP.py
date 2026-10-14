@@ -16,7 +16,7 @@ _EXCEL_EPOCH = date_type(1899, 12, 30)
 
 # Versão da lógica (.py). O .xlam é versionado por NOME de arquivo (CalcCP_vN.xlam);
 # a lógica aqui é retrocompatível (só adiciona UDF, nunca remove/renomeia) — ver CHANGELOG.md.
-VERSION = "5.0.1"
+VERSION = "6.0.0"
 
 # Todas as UDFs têm o prefixo cp (ex.: =cpPu, =cpTaxa, =cpVna...).
 # Títulos com API (debênture, CRI/CRA, NTN-B…): via B3 → FI Analytics → bondbuilder.
@@ -448,6 +448,18 @@ def cpAniversario(ticker):
         return float(v) if v is not None else "ERRO: aniversário indisponível"
     except Exception as e:
         return _erro("aniv", e)
+
+
+@xw.func
+def cpEmissor(ticker):
+    """Nome do emissor do papel (B3 getBondDetails). Em CRI/CRA é a securitizadora."""
+    if _IMPORT_ERROR:
+        return f"ERRO import: {_IMPORT_ERROR}"
+    try:
+        v = CampoBond(str(ticker).upper().strip(), "issuer")
+        return v.strip() if isinstance(v, str) and v.strip() else "ERRO: emissor indisponível"
+    except Exception as e:
+        return _erro("emissor", e)
 
 
 # =============================================================================

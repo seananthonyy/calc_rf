@@ -4,6 +4,24 @@ Versionamento: a **lógica** (`.py`) é retrocompatível; o **`.xlam` é version
 (`CalcCP_vN.xlam`) — versões antigas ficam na share e não quebram quem já usa.
 `VERSION` no `CalcCP.py` acompanha a lógica.
 
+## v6.0.0 — 2026-10-14 — `CalcCP_v6.xlam`: `=cpEmissor` (38 UDFs)
+
+**Arquivo NOVO `CalcCP_v6.xlam`** (v1…v5 intocados). Uma fórmula nova:
+
+| Fórmula | Retorno |
+|---|---|
+| `=cpEmissor(ticker)` | nome do emissor do papel, do cadastro da B3 (`getBondDetails`) |
+
+- **Só B3, sem fallback.** A API da FI Analytics não devolve emissor (só o site tem). Papel sem
+  cadastro na B3 (título público, parte dos CRA) dá `ERRO: emissor indisponível`.
+- **Em CRI/CRA vem a securitizadora**, que é quem a B3 cadastra como emissor (ex.: `24I1419236` →
+  `OPEA SECURITIZADORA SA`), não o devedor do lastro.
+- Validado ao vivo: `FGEN13` → `FERREIRA GOMES ENERGIA S.A.`, `PALF38` → `COMPANHIA PAULISTA DE FORCA E LUZ`.
+- Migrar = desmarcar o v5 nos Suplementos e procurar o `CalcCP_v6.xlam`. Quem ficar no v5 segue
+  funcionando (sem o `=cpEmissor`). Re-bake com `xlwings_udfs` removido antes do `import_udfs`;
+  verificado no arquivo final (só-leitura): 38 UDFs, `CallUDF("CalcCP")`, zip íntegro, 0 PII,
+  config `%CALCCP_DIR%;Z:\CP` preservada.
+
 ## v5.0.1 — 2026-10-13 — bondbuilder na rota certa (só lógica; **sem re-bake**, `CalcCP_v5.xlam` inalterado)
 
 O fallback **bondbuilder** (3ª fonte da cascata B3 → FI → bondbuilder, para papéis fora de `/deb` e

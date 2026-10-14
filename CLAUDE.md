@@ -4,6 +4,13 @@
 
 Documentação técnica para o Claude Code. Leia antes de alterar qualquer coisa nesta pasta.
 
+> ## 🟢 ATUALIZAÇÃO 14/10/2026 — v6.0.0: `CalcCP_v6.xlam` — `cpEmissor(ticker)` (38 UDFs)
+> - `getBondDetails.issuer` via `CampoBond`, **só B3, sem fallback** (decisão do usuário). A FI
+>   Analytics **não tem emissor na API** (`/deb`/`/cr` conferidos: ~90 chaves, nenhuma de emissor; só
+>   no CSV do site). Em CRI/CRA o `issuer` é a securitizadora. Título público não tem `getBondDetails`.
+> - Re-bake COM do DEV (removendo `xlwings_udfs` antes) → scrub → transplante p/ cópia do v5. `.bin`
+>   183.296 → 187.904 bytes. Verificado só-leitura: 38 UDFs, `CallUDF("CalcCP")`, 0 PII, config intacta.
+
 > ## 🟢 ATUALIZAÇÃO 13/10/2026 — v5.0.1: bondbuilder em `/userdefinedbond/bondcalculator` (só `.py`)
 > - Corpo `{user_email, bond_name, date, settlement_date, useIntradayCurve, rate|pu}`; sem
 >   `getuserbonds`/`doc_id`. Chave `token_fianalytics_bond_builder` → fallback `_bb` → antiga.
