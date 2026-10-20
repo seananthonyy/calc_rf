@@ -4,6 +4,17 @@ Versionamento: a **lógica** (`.py`) é retrocompatível; o **`.xlam` é version
 (`CalcCP_vN.xlam`) — versões antigas ficam na share e não quebram quem já usa.
 `VERSION` no `CalcCP.py` acompanha a lógica.
 
+## v7.0.2 — 2026-10-20 — atualizar com o Excel aberto não derruba mais as fórmulas (só lógica; **sem re-bake**)
+
+- **Bug:** rodar o bundle da v7.0.1 com o Excel aberto fazia **todas** as fórmulas darem
+  `cannot import name 'FluxoFuturo' from 'apis'`. O xlwings recarrega o `CalcCP.py` quando ele muda,
+  mas o `apis.py` antigo continuava na memória do Python do Excel.
+- **Correção:** o `CalcCP.py` agora recarrega também `config`, `di`, `apis` e `basedados` quando é
+  recarregado. Vale para as próximas atualizações.
+- ⚠️ **Quem já está com o erro** (atualizou para a v7.0.1 com o Excel aberto): fechar o Excel inteiro,
+  finalizar os `pythonw.exe` no Gerenciador de Tarefas e reabrir — não precisa rodar o bundle de novo,
+  mas rodar também resolve depois de reiniciar.
+
 ## v7.0.1 — 2026-10-20 — `=cpValorFuturo` calcula sempre na data de hoje (só lógica; **sem re-bake**, `CalcCP_v7.xlam` inalterado)
 
 - **Data de cálculo = hoje** (o dia útil anterior, para o pagamento de hoje entrar — a API não lista

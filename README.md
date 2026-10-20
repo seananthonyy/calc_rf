@@ -126,7 +126,7 @@ Esse arquivo é **por PC e por usuário** (não vai pro repositório).
 ### 6. Testar
 Feche e reabra o Excel:
 ```
-=cpTeste()                              -> OK v7.0.1 — path: Z:\CP — CALCCP_DIR=Z:\CP — trades.db: OK (ANBIMA até 2026-07-17) — ...
+=cpTeste()                              -> OK v7.0.2 — path: Z:\CP — CALCCP_DIR=Z:\CP — trades.db: OK (ANBIMA até 2026-07-17) — ...
 =cpPu("FGEN13"; "13/06/2025"; 6,4686%)  -> ~961,70
 =cpPu("DI1F27"; "01/07/2026"; 10%)      -> ~95310,20   (DI, cálculo local)
 =cpAnbimaRef("FGEN13")                  -> NTN-B 27    (leitura do trades.db)
@@ -307,6 +307,7 @@ renomeia** (senão quebra planilhas e `.xlam` antigos). O **`.xlam` é versionad
 | `#NAME?` só em `=cpAnbimaSpread` (as outras `=cpAnbima…` funcionam) | add-in registrado é o `_v3` — a UDF nova só existe no v4 | registrar o `CalcCP_v7.xlam` (passo 4). A coluna Spread do histórico já funciona no v3, porque depende só dos `.py` |
 | `#NAME?` só em `=cpEmissor` | add-in registrado é o `_v5` ou anterior — a UDF só existe no v6 | registrar o `CalcCP_v7.xlam` (passo 4) |
 | `#NAME?` só em `=cpValorFuturo` | add-in registrado é o `_v6` ou anterior — a UDF só existe no v7 | registrar o `CalcCP_v7.xlam` (passo 4) |
+| `cannot import name '...' from 'apis'` em TODAS as fórmulas | bundle rodado com o Excel aberto: o Python do Excel ficou com o `apis.py` antigo na memória (corrigido na v7.0.2 — só acontece ao atualizar **a partir** de uma versão anterior a ela) | fechar o Excel inteiro, finalizar os `pythonw.exe` no Gerenciador de Tarefas e reabrir |
 | `Input past end of file` | `myaddin.conf` com linha em branco sobrando | recriar com o snippet do passo 5 |
 | aba não aparece / `#NAME?` | add-in não habilitado ou VBA não liberado | passos 3 e 4 |
 | Excel congela/pisca em planilha do SharePoint | resolução de URL do PYTHONPATH / write-back de UDF assíncrona | já mitigado no `.xlam` (config + UDFs síncronas); paliativo: cálculo Manual/F9. Ver `CLAUDE.md` |

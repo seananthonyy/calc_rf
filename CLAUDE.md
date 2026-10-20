@@ -4,6 +4,15 @@
 
 Documentação técnica para o Claude Code. Leia antes de alterar qualquer coisa nesta pasta.
 
+> ## 🟢 ATUALIZAÇÃO 20/10/2026 (2) — v7.0.2: `CalcCP.py` recarrega `config`/`di`/`apis`/`basedados`
+> - O xlwings recarrega o módulo de UDF quando o `.py` muda no disco, **mas não as dependências**.
+>   Bundle rodado com Excel aberto → `CalcCP.py` novo + `apis` antigo em `sys.modules` → `cannot import
+>   name 'FluxoFuturo' from 'apis'` e `_IMPORT_ERROR` derruba TODAS as UDFs (aconteceu no banco, v7.0.1).
+>   Agora o topo do `CalcCP.py` dá `importlib.reload` nos irmãos já carregados. Reproduzido e validado
+>   simulando o processo (v5 carregado → arquivos trocados → `importlib.reload(CalcCP)`).
+> - **Regra daqui pra frente:** símbolo novo em `apis.py` importado pelo `CalcCP.py` é seguro (o reload
+>   resolve); módulo NOVO tem que entrar na tupla do reload.
+
 > ## 🟢 ATUALIZAÇÃO 20/10/2026 — v7.0.0: `CalcCP_v7.xlam` — `cpValorFuturo(ticker, dataInicio, dataFim)` (39 UDFs)
 > - Soma o VF dos eventos com data de pagamento (ajustada p/ DU) em `[dataInicio, dataFim]`. Fonte:
 >   `apis.FluxoFuturo` (B3 `calcPU.cashFlowList` → FI `cashFlowEvents`, na ordem do memo de fonte).

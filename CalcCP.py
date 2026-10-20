@@ -7,16 +7,28 @@ _THIS_DIR = os.path.dirname(os.path.abspath(__file__))
 if _THIS_DIR not in sys.path:
     sys.path.insert(0, _THIS_DIR)
 
+import importlib
 from datetime import datetime, date as date_type, timedelta
 
 import xlwings as xw
+
+# O xlwings recarrega ESTE módulo quando o CalcCP.py muda no disco, mas não os módulos que ele
+# importa: com o Excel aberto durante a atualização, o apis.py antigo ficava na memória e o
+# CalcCP.py novo quebrava no import ("cannot import name 'FluxoFuturo' from 'apis'"), derrubando
+# TODAS as fórmulas. Recarrega os irmãos já carregados (config primeiro: os outros dependem dele).
+for _nome in ("config", "di", "apis", "basedados"):
+    if _nome in sys.modules:
+        try:
+            importlib.reload(sys.modules[_nome])
+        except Exception:
+            pass   # se falhar, o import abaixo reporta o erro de verdade em _IMPORT_ERROR
 
 # Epoch do serial de datas do Excel (Windows): base efetiva 30/12/1899.
 _EXCEL_EPOCH = date_type(1899, 12, 30)
 
 # Versão da lógica (.py). O .xlam é versionado por NOME de arquivo (CalcCP_vN.xlam);
 # a lógica aqui é retrocompatível (só adiciona UDF, nunca remove/renomeia) — ver CHANGELOG.md.
-VERSION = "7.0.1"
+VERSION = "7.0.2"
 
 # Todas as UDFs têm o prefixo cp (ex.: =cpPu, =cpTaxa, =cpVna...).
 # Títulos com API (debênture, CRI/CRA, NTN-B…): via B3 → FI Analytics → bondbuilder.
