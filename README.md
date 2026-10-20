@@ -126,7 +126,7 @@ Esse arquivo é **por PC e por usuário** (não vai pro repositório).
 ### 6. Testar
 Feche e reabra o Excel:
 ```
-=cpTeste()                              -> OK v7.0.0 — path: Z:\CP — CALCCP_DIR=Z:\CP — trades.db: OK (ANBIMA até 2026-07-17) — ...
+=cpTeste()                              -> OK v7.0.1 — path: Z:\CP — CALCCP_DIR=Z:\CP — trades.db: OK (ANBIMA até 2026-07-17) — ...
 =cpPu("FGEN13"; "13/06/2025"; 6,4686%)  -> ~961,70
 =cpPu("DI1F27"; "01/07/2026"; 10%)      -> ~95310,20   (DI, cálculo local)
 =cpAnbimaRef("FGEN13")                  -> NTN-B 27    (leitura do trades.db)
@@ -174,7 +174,7 @@ ou a mensagem de que não foi encontrado (aí só as fórmulas `=cpAnbima…` fi
 | `=cpVna(ticker; data; [taxa%])` | VNA — Valor Nominal Atualizado |
 | `=cpFluxo(ticker; data; [taxa%])` | Agenda **RESTANTE** a partir da data (spill): Data · Tipo · %Amort · %Incorp |
 | `=cpFluxoCompleto(ticker)` | Agenda **INTEIRA**, desde a emissão (spill): Data · %Amort · %Incorp |
-| `=cpValorFuturo(ticker; dataInicio; dataFim)` | Soma do **valor futuro** dos pagamentos (juros + amortização) com data de pagamento entre as duas datas, **inclusive**. B3 → FI Analytics. Valores projetados no dia útil anterior à `dataInicio`; incorporação não conta (só o que é pago). `0` = nenhum pagamento no intervalo |
+| `=cpValorFuturo(ticker; dataInicio; dataFim)` | Soma do **valor futuro** dos pagamentos (juros + amortização) com data de pagamento entre as duas datas, **inclusive**. B3 → FI Analytics. Calcula **sempre na data de hoje** (dia útil anterior, para o pagamento de hoje entrar): só conta pagamento **de hoje em diante**. Incorporação não conta (só o que é pago). `0` = nenhum pagamento no intervalo |
 | `=cpVencimento(ticker)` | Data de vencimento |
 | `=cpEmissao(ticker)` | Data de emissão |
 | `=cpInicioRentabilidade(ticker)` | Data de início de rentabilidade |

@@ -4,6 +4,18 @@ Versionamento: a **lógica** (`.py`) é retrocompatível; o **`.xlam` é version
 (`CalcCP_vN.xlam`) — versões antigas ficam na share e não quebram quem já usa.
 `VERSION` no `CalcCP.py` acompanha a lógica.
 
+## v7.0.1 — 2026-10-20 — `=cpValorFuturo` calcula sempre na data de hoje (só lógica; **sem re-bake**, `CalcCP_v7.xlam` inalterado)
+
+- **Data de cálculo = hoje** (o dia útil anterior, para o pagamento de hoje entrar — a API não lista
+  o evento da própria data de cálculo), qualquer que seja o intervalo. A API devolve o valor futuro de
+  cada pagamento até o vencimento e a fórmula soma os que caem entre `dataInicio` e `dataFim`,
+  inclusive. Pagamentos anteriores a hoje não entram: intervalo todo no passado → `0`.
+- **Corrige papel que só existe na FI Analytics:** na v7.0.0 o cálculo era feito na véspera da
+  `dataInicio`, e a FI recusa data futura → intervalo futuro dava `ERRO`. Agora funciona
+  (`CRA0210012Y` 01/03/2027–31/12/2027 → 68,166493).
+- A taxa da chamada é fixa: o valor futuro não depende dela (conferido em IPCA, %CDI, CDI+, pré e
+  CRA via FI, com taxa 10 e 128). Uma ida a menos à B3 por célula.
+
 ## v7.0.0 — 2026-10-20 — `CalcCP_v7.xlam`: `=cpValorFuturo` (39 UDFs)
 
 **Arquivo NOVO `CalcCP_v7.xlam`** (v1…v6 intocados). Uma fórmula nova:

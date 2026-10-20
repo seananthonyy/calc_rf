@@ -7,11 +7,12 @@ Documentação técnica para o Claude Code. Leia antes de alterar qualquer coisa
 > ## 🟢 ATUALIZAÇÃO 20/10/2026 — v7.0.0: `CalcCP_v7.xlam` — `cpValorFuturo(ticker, dataInicio, dataFim)` (39 UDFs)
 > - Soma o VF dos eventos com data de pagamento (ajustada p/ DU) em `[dataInicio, dataFim]`. Fonte:
 >   `apis.FluxoFuturo` (B3 `calcPU.cashFlowList` → FI `cashFlowEvents`, na ordem do memo de fonte).
-> - **Data de cálculo = DU anterior à `dataInicio`**: as APIs só listam eventos ESTRITAMENTE posteriores
->   à data (conferido: AMERF2 calculado em 26/10 não traz o J de 26/10). Antes do início de
->   rentabilidade → calcula no início (as APIs recusam data pré-emissão). FI recusa data futura; B3 aceita.
-> - **VF não depende da taxa** (conferido IPCA/DI/PRE, taxa de emissão vs +2 p.p.) → usa a de emissão ou
->   `_TAXA_SONDA`. Em DI a B3 e a FI projetam com curvas diferentes (AALM12: 1348,67 × 1345,45).
+> - **Data de cálculo = SEMPRE o DU anterior a HOJE** (regra do usuário, v7.0.1 — a v7.0.0 calculava no DU
+>   anterior à `dataInicio` e quebrava em papel só-FI: a FI recusa data futura e data perto da emissão).
+>   DU anterior e não hoje porque as APIs só listam eventos ESTRITAMENTE posteriores à data (AMERF2
+>   calculado em 26/10 não traz o J de 26/10). Pagamento antes de hoje não entra (intervalo passado → 0).
+> - **VF não depende da taxa** (conferido IPCA/%CDI/CDI+/PRE e CRA via FI, taxa 10 × 128) → sempre
+>   `_TAXA_SONDA`, sem ida ao `getBondDetails`. Em DI a B3 e a FI projetam com curvas diferentes (AALM12: 1348,67 × 1345,45).
 > - **Incorporação já vem descontada**: B3 `finalValue` = só o pago (FGEN13 12/2014 incorp 100% → 0).
 > - **Bug corrigido em `_FluxoB3`**: lia o VF de `fat*Vf` (sempre None) — o campo é `finalValue`
 >   (`presentValue`, `workingDays`). Afetava o fallback B3 de `FluxoRestante`/`Detalhes` (sem UDF hoje).
