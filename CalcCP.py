@@ -16,7 +16,7 @@ _EXCEL_EPOCH = date_type(1899, 12, 30)
 
 # Versão da lógica (.py). O .xlam é versionado por NOME de arquivo (CalcCP_vN.xlam);
 # a lógica aqui é retrocompatível (só adiciona UDF, nunca remove/renomeia) — ver CHANGELOG.md.
-VERSION = "6.0.0"
+VERSION = "7.0.0"
 
 # Todas as UDFs têm o prefixo cp (ex.: =cpPu, =cpTaxa, =cpVna...).
 # Títulos com API (debênture, CRI/CRA, NTN-B…): via B3 → FI Analytics → bondbuilder.
@@ -26,7 +26,7 @@ _IMPORT_ERROR = None
 try:
     from apis import (
         Preco, PuPar, TaxaOp, LimparCache, FatorDi, FonteCalculo, FonteTicker,
-        CampoBond, CampoFi, FluxoCadastrado, BcbValor, IpcaIndice,
+        CampoBond, CampoFi, FluxoCadastrado, FluxoFuturo, BcbValor, IpcaIndice,
     )
     import di
 except Exception as _e:
@@ -354,6 +354,39 @@ def _ajusta_du_iso(iso):
         return di.ProximoDu(d).isoformat()
     except Exception:
         return iso
+
+
+@xw.func
+def cpValorFuturo(ticker, dataInicio, dataFim):
+    """Soma do VALOR FUTURO dos pagamentos (juros + amortização) com data de pagamento entre
+    dataInicio e dataFim, INCLUSIVE as duas. Datas de evento ajustadas p/ dia útil (ANBIMA).
+
+    Valores projetados como vistos no dia útil anterior a dataInicio (data de cálculo da API — ela
+    só lista eventos POSTERIORES à data, então calcular na própria dataInicio perderia o pagamento
+    desse dia). dataInicio antes do início de rentabilidade → calcula no início de rentabilidade.
+    Fonte: B3 → FI Analytics. 0 = nenhum pagamento no intervalo."""
+    if _IMPORT_ERROR:
+        return f"ERRO import: {_IMPORT_ERROR}"
+    try:
+        ticker = str(ticker).upper().strip()
+        ini, fim = _parse_data(dataInicio), _parse_data(dataFim)
+        if fim < ini:
+            return "ERRO: dataFim anterior à dataInicio"
+        base = ini - timedelta(days=1)
+        while not di.EhDu(base):
+            base -= timedelta(days=1)
+        inicio = CampoBond(ticker, "startingdate")
+        if inicio and base.isoformat() < str(inicio)[:10]:
+            base = date_type.fromisoformat(str(inicio)[:10])
+        taxa = CampoBond(ticker, "yield")
+        r = FluxoFuturo(ticker, base.isoformat(), float(taxa) if taxa is not None else _TAXA_SONDA)
+        if r is None:
+            return "ERRO: fluxo indisponível (B3/FI)"
+        iniIso, fimIso = ini.isoformat(), fim.isoformat()
+        return float(sum(e["vf"] for e in r[1]
+                         if e["vf"] is not None and iniIso <= _ajusta_du_iso(e["data"]) <= fimIso))
+    except Exception as e:
+        return _erro("vf", e)
 
 
 @xw.func

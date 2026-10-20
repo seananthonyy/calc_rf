@@ -4,6 +4,18 @@
 
 Documentação técnica para o Claude Code. Leia antes de alterar qualquer coisa nesta pasta.
 
+> ## 🟢 ATUALIZAÇÃO 20/10/2026 — v7.0.0: `CalcCP_v7.xlam` — `cpValorFuturo(ticker, dataInicio, dataFim)` (39 UDFs)
+> - Soma o VF dos eventos com data de pagamento (ajustada p/ DU) em `[dataInicio, dataFim]`. Fonte:
+>   `apis.FluxoFuturo` (B3 `calcPU.cashFlowList` → FI `cashFlowEvents`, na ordem do memo de fonte).
+> - **Data de cálculo = DU anterior à `dataInicio`**: as APIs só listam eventos ESTRITAMENTE posteriores
+>   à data (conferido: AMERF2 calculado em 26/10 não traz o J de 26/10). Antes do início de
+>   rentabilidade → calcula no início (as APIs recusam data pré-emissão). FI recusa data futura; B3 aceita.
+> - **VF não depende da taxa** (conferido IPCA/DI/PRE, taxa de emissão vs +2 p.p.) → usa a de emissão ou
+>   `_TAXA_SONDA`. Em DI a B3 e a FI projetam com curvas diferentes (AALM12: 1348,67 × 1345,45).
+> - **Incorporação já vem descontada**: B3 `finalValue` = só o pago (FGEN13 12/2014 incorp 100% → 0).
+> - **Bug corrigido em `_FluxoB3`**: lia o VF de `fat*Vf` (sempre None) — o campo é `finalValue`
+>   (`presentValue`, `workingDays`). Afetava o fallback B3 de `FluxoRestante`/`Detalhes` (sem UDF hoje).
+
 > ## 🟢 ATUALIZAÇÃO 14/10/2026 — v6.0.0: `CalcCP_v6.xlam` — `cpEmissor(ticker)` (38 UDFs)
 > - `getBondDetails.issuer` via `CampoBond`, **só B3, sem fallback** (decisão do usuário). A FI
 >   Analytics **não tem emissor na API** (`/deb`/`/cr` conferidos: ~90 chaves, nenhuma de emissor; só

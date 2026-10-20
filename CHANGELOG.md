@@ -4,6 +4,28 @@ Versionamento: a **lógica** (`.py`) é retrocompatível; o **`.xlam` é version
 (`CalcCP_vN.xlam`) — versões antigas ficam na share e não quebram quem já usa.
 `VERSION` no `CalcCP.py` acompanha a lógica.
 
+## v7.0.0 — 2026-10-20 — `CalcCP_v7.xlam`: `=cpValorFuturo` (39 UDFs)
+
+**Arquivo NOVO `CalcCP_v7.xlam`** (v1…v6 intocados). Uma fórmula nova:
+
+| Fórmula | Retorno |
+|---|---|
+| `=cpValorFuturo(ticker; dataInicio; dataFim)` | soma do valor futuro dos pagamentos do papel com data de pagamento entre as duas datas (inclusive) |
+
+- **O que entra:** juros e amortização, pela data de **pagamento** (evento em fim de semana/feriado
+  conta no dia útil seguinte). Incorporação de juros não é pagamento e já vem fora — a B3 devolve só
+  a parte paga. Sem pagamento no intervalo → `0`.
+- **Valores projetados como vistos no dia útil anterior à `dataInicio`** (as APIs só listam eventos
+  posteriores à data de cálculo). Para papel IPCA/DI, mudar a `dataInicio` muda a projeção: FGEN13
+  dez/2026 dá 180,34 calculado em 20/10 e 180,49 calculado em 30/11. Início antes da emissão →
+  calcula no início de rentabilidade.
+- **Fonte:** B3 → FI Analytics. A FI não aceita data futura (só a B3). Em papel DI as duas usam curvas
+  próprias e diferem um pouco. A taxa não entra: o valor futuro não depende dela.
+- Validado ao vivo contra os eventos das APIs: FGEN13 16/06/2025 → 175,590998 (146,607281 + 28,983717);
+  AMERF2 26/10/2026 → 42,16715694 (evento no próprio dia); CRA0210012Y via FI.
+- Corrigido de carona: o fluxo da B3 (`apis._FluxoB3`) lia o valor futuro do campo errado (vinha vazio).
+  Nenhuma fórmula existente usava esse caminho.
+
 ## v6.0.0 — 2026-10-14 — `CalcCP_v6.xlam`: `=cpEmissor` (38 UDFs)
 
 **Arquivo NOVO `CalcCP_v6.xlam`** (v1…v5 intocados). Uma fórmula nova:

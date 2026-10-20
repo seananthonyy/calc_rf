@@ -785,12 +785,36 @@ def _FluxoFi(f):
 def _FluxoB3(full):
     fluxo = []
     for e in (full.get("cashFlowList") or []):
-        # a B3 usa nomes fat*Vf/fat*Vp variáveis; pega o 1º *Vf/*Vp preenchido.
-        vf = next((v for k, v in e.items() if k.lower().endswith("vf") and v is not None), None)
-        vp = next((v for k, v in e.items() if k.lower().endswith("vp") and v is not None), None)
+        # Valor futuro/presente do evento = finalValue/presentValue. Os fat*Vf/fat*Vp são
+        # fatores e vêm None nos papéis conferidos (IPCA, DI, PRE) — ficam só de reserva.
+        vf = e.get("finalValue")
+        if vf is None:
+            vf = next((v for k, v in e.items() if k.lower().endswith("vf") and v is not None), None)
+        vp = e.get("presentValue")
+        if vp is None:
+            vp = next((v for k, v in e.items() if k.lower().endswith("vp") and v is not None), None)
         fluxo.append({"data": e.get("date"), "tipo": e.get("eventType"),
-                      "prazo": e.get("term"), "vf": vf, "vp": vp})
+                      "prazo": e.get("workingDays"), "vf": vf, "vp": vp})
     return fluxo
+
+
+def FluxoFuturo(ticker, dataIso, taxa):
+    """Eventos ESTRITAMENTE posteriores a `dataIso` com valor futuro: (fonte, [{data,tipo,prazo,vf,vp}])
+    ou None. Cascata B3 → FI (/deb, /cr, bondbuilder), na ordem do memo de fonte do ticker.
+
+    O valor futuro não depende da taxa (conferido em IPCA, DI e PRE) — `taxa` só monta a chamada.
+    A FI recusa data futura; a B3 aceita. Papel DI: as duas projetam com curvas próprias e diferem."""
+    tk = str(ticker).upper().strip()
+    for src in _OrdemFontes(tk, ["b3", "fi"]):
+        if src == "b3":
+            full = _CalcPuB3Full(tk, dataIso, taxa)
+            if isinstance(full, dict):
+                return "b3", _FluxoB3(full)
+        else:
+            f = _FiFull(tk, dataIso, taxa)
+            if isinstance(f, dict):
+                return "fi", _FluxoFi(f)
+    return None
 
 
 def Detalhes(ticker, dataIso, taxa):
