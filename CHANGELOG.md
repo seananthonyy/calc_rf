@@ -4,6 +4,22 @@ Versionamento: a **lógica** (`.py`) é retrocompatível; o **`.xlam` é version
 (`CalcCP_vN.xlam`) — versões antigas ficam na share e não quebram quem já usa.
 `VERSION` no `CalcCP.py` acompanha a lógica.
 
+## v7.0.4 — 2026-11-04 — chaves da FI com os nomes do banco (só lógica; **sem re-bake**)
+
+- As chaves da FI Analytics agora são lidas **só** destas variáveis de ambiente:
+
+  | Variável | Produto |
+  |---|---|
+  | `token_fianalytics_debentures` | Debêntures (`/deb`) |
+  | `token_fianalytics_cri_cra` | CRIs/CRAs (`/cr`) |
+  | `token_fianalytics_bond_builder` | Bond Builder |
+  | `token_fianalytics_titulos_publicos` | Títulos públicos (reservada; o add-in ainda não chama a FI p/ título público) |
+
+- **Removidos:** os nomes antigos (`token_fianalytics_deb`, `_cricra`, `_bb`), a chave única
+  `token_fianalytics` como fallback e a leitura dessas chaves pelo `.env`. Variável faltando aparece
+  no erro: `FI: /deb variável token_fianalytics_debentures não setada`.
+- Corrige o UGPQ13 (debênture que a B3 não tem) no banco, onde a variável se chama `_debentures`.
+
 ## v7.0.3 — 2026-11-04 — mensagem de erro mostra o motivo real (só lógica; **sem re-bake**)
 
 - `=cpPu`, `=cpTaxa`, `=cpDur` e `=cpPupar`: no lugar do genérico `ERRO: APIs sem resposta (B3/FI)`,

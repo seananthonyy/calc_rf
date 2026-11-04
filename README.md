@@ -73,10 +73,10 @@ usuário** (nenhuma precisa de admin/sistema):
 |---|---|
 | `CALCCP_DIR` | **pasta onde estão os arquivos do add-in** neste PC (ex.: `Z:\CP`). Se não setar, o `.xlam` cai no fallback `Z:\CP`. |
 | `token_calc_b3` | token do B3 Calculator |
-| `token_fianalytics_deb` | API key FI Analytics — **Debêntures** (desde 30/09/2026) |
-| `token_fianalytics_cricra` | API key FI Analytics — **CRIs/CRAs** |
-| `token_fianalytics_bond_builder` | API key FI Analytics — **Bond Builder** (fallback bondbuilder). O nome antigo `token_fianalytics_bb` também é aceito |
-| `token_fianalytics` | chave única **antiga** da FI (desativada pela FI em 30/09/2026). Só é usada quando a chave do produto não está setada — pode apagar depois de setar as três acima. |
+| `token_fianalytics_debentures` | API key FI Analytics — **Debêntures** |
+| `token_fianalytics_cri_cra` | API key FI Analytics — **CRIs/CRAs** |
+| `token_fianalytics_bond_builder` | API key FI Analytics — **Bond Builder** (fallback bondbuilder) |
+| `token_fianalytics_titulos_publicos` | API key FI Analytics — **Títulos públicos** (reservada; ainda não usada pelo add-in) |
 | `user_fianalytics` | e-mail do usuário FI (só p/ o fallback bondbuilder; opcional) |
 | `proxy_http` | `http://USUARIO:SENHA@HOST:PORTA` |
 | `proxy_https` | `http://USUARIO:SENHA@HOST:PORTA` |
@@ -126,7 +126,7 @@ Esse arquivo é **por PC e por usuário** (não vai pro repositório).
 ### 6. Testar
 Feche e reabra o Excel:
 ```
-=cpTeste()                              -> OK v7.0.3 — path: Z:\CP — CALCCP_DIR=Z:\CP — trades.db: OK (ANBIMA até 2026-07-17) — ...
+=cpTeste()                              -> OK v7.0.4 — path: Z:\CP — CALCCP_DIR=Z:\CP — trades.db: OK (ANBIMA até 2026-07-17) — ...
 =cpPu("FGEN13"; "13/06/2025"; 6,4686%)  -> ~961,70
 =cpPu("DI1F27"; "01/07/2026"; 10%)      -> ~95310,20   (DI, cálculo local)
 =cpAnbimaRef("FGEN13")                  -> NTN-B 27    (leitura do trades.db)
@@ -139,7 +139,7 @@ ou a mensagem de que não foi encontrado (aí só as fórmulas `=cpAnbima…` fi
 - [ ] Pasta com os arquivos (ex.: `Z:\CP`) atualizada
 - [ ] `CALCCP_DIR` setada apontando pra essa pasta (ou usar o fallback `Z:\CP`)
 - [ ] Python 64-bit com xlwings **0.36.6** + DLL na raiz
-- [ ] `token_calc_b3`, `token_fianalytics_deb`, `token_fianalytics_cricra`, `token_fianalytics_bond_builder`, `proxy_http`, `proxy_https` setados
+- [ ] `token_calc_b3`, `token_fianalytics_debentures`, `token_fianalytics_cri_cra`, `token_fianalytics_bond_builder`, `proxy_http`, `proxy_https` setados
 - [ ] "Confiar no acesso ao modelo de objeto de projeto do VBA" ligado
 - [ ] `.xlam` habilitado (aba **CalcCP** aparece)
 - [ ] (se multi-Python) `myaddin.conf` com a chave `Interpreter`

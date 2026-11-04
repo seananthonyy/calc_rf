@@ -4,6 +4,13 @@
 
 Documentação técnica para o Claude Code. Leia antes de alterar qualquer coisa nesta pasta.
 
+> ## 🟢 ATUALIZAÇÃO 04/11/2026 (2) — v7.0.4: chaves FI = nomes do banco, sem fallback
+> - `token_fianalytics_debentures` (/deb), `token_fianalytics_cri_cra` (/cr), `token_fianalytics_bond_builder`
+>   (bb), `token_fianalytics_titulos_publicos` (constante `ENV_KEY_FI_TP`, sem uso). Lidas SÓ de `os.getenv`
+>   (`_ChaveFi`/`_VarChaveFi`) — sem `.env`, sem `token_fianalytics` antiga, sem `_deb/_cricra/_bb`.
+>   Decisão do usuário: "considera só que as variáveis são essas", local e banco iguais.
+> - Causa do UGPQ13 no banco: a variável lá é `_debentures`, o add-in lia `_deb`.
+
 > ## 🟢 ATUALIZAÇÃO 04/11/2026 — v7.0.3: erro das UDFs de preço mostra o motivo real (só `.py`)
 > - `apis._Falhou(msg)` grava o motivo da falha de rede/HTTP/corpo em `_ultimoErro`; a cascata
 >   (`Preco`/`PuPar`/`TaxaOp`) zera antes de cada fonte e, se a fonte falha, `_RegistrarFalha` copia

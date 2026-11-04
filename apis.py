@@ -32,12 +32,12 @@ from config import ENV_PATH
 # Nomes das variáveis de ambiente (definidas no banco). O add-in lê os segredos
 # daqui em produção; o .env serve só como fallback de desenvolvimento local.
 ENV_TOKEN_B3 = "token_calc_b3"
-ENV_KEY_FI   = "token_fianalytics"          # chave única antiga (FI desativa em 30/09/2026) — só fallback
-# Desde set/2026 a FI exige uma chave POR PRODUTO. Cada endpoint lê a sua; sem ela, cai na antiga.
-ENV_KEY_FI_DEB = "token_fianalytics_deb"      # Debêntures   (/deb)
-ENV_KEY_FI_CR  = "token_fianalytics_cricra"   # CRIs/CRAs    (/cr)
-ENV_KEY_FI_BB  = "token_fianalytics_bond_builder"  # Bond Builder (/userdefinedbond)
-ENV_KEY_FI_BB_ANTIGA = "token_fianalytics_bb"     # nome antigo da mesma chave — só fallback
+# FI Analytics: uma chave POR PRODUTO, lida SÓ da variável de ambiente do produto (sem .env e
+# sem fallback para outra chave). Nomes iguais aos do banco.
+ENV_KEY_FI_DEB = "token_fianalytics_debentures"       # Debêntures      (/deb)
+ENV_KEY_FI_CR  = "token_fianalytics_cri_cra"          # CRIs/CRAs       (/cr)
+ENV_KEY_FI_BB  = "token_fianalytics_bond_builder"     # Bond Builder    (/userdefinedbond)
+ENV_KEY_FI_TP  = "token_fianalytics_titulos_publicos" # Títulos públicos (sem endpoint FI no add-in hoje)
 ENV_USER_FI  = "user_fianalytics"   # e-mail do usuário FI, vai no corpo do bondbuilder (fallback: FIANALYTICS_USER)
 
 # Proxy — env vars com a URL completa, incluindo usuário/senha, no formato
@@ -434,24 +434,25 @@ def FatorDi(dataInicioIso, dataFimIso, percentual=100.0):
 # -----------------------------------------------------------------------------
 
 def _ChaveFi(path):
-    """API key do produto FI dono do endpoint (1ª parte do path); fallback = chave única antiga."""
-    produto = path.strip("/").split("/")[0]
-    especifica = {
-        "deb": (ENV_KEY_FI_DEB, "FIANALYTICS_API_KEY_DEB"),
-        "cr":  (ENV_KEY_FI_CR,  "FIANALYTICS_API_KEY_CRICRA"),
-        "userdefinedbond": (ENV_KEY_FI_BB, "FIANALYTICS_API_KEY_BB"),
-    }.get(produto)
-    if produto == "userdefinedbond":
-        return (_Cred(*especifica) or os.getenv(ENV_KEY_FI_BB_ANTIGA)
-                or _Cred(ENV_KEY_FI, "FIANALYTICS_API_KEY"))
-    return (especifica and _Cred(*especifica)) or _Cred(ENV_KEY_FI, "FIANALYTICS_API_KEY")
+    """API key do produto FI dono do endpoint (1ª parte do path), só da variável de ambiente."""
+    nome = _VarChaveFi(path)
+    return os.getenv(nome) if nome else None
+
+
+def _VarChaveFi(path):
+    """Nome da variável de ambiente da chave do produto FI dono do endpoint."""
+    return {
+        "deb": ENV_KEY_FI_DEB,
+        "cr": ENV_KEY_FI_CR,
+        "userdefinedbond": ENV_KEY_FI_BB,
+    }.get(path.strip("/").split("/")[0])
 
 
 def _PostFi(corpo, path=FI_DEB_PATH):
     """POST num endpoint FI. Resposta é double-encoded. dict ou None."""
     chave = _ChaveFi(path)
     if not chave:
-        _Falhou("chave da FI não setada para /" + path.strip("/").split("/")[0])
+        _Falhou(f"variável {_VarChaveFi(path)} não setada")
         return None
     try:
         req = urllib.request.Request(
