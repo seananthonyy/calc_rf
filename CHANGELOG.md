@@ -4,6 +4,21 @@ Versionamento: a **lógica** (`.py`) é retrocompatível; o **`.xlam` é version
 (`CalcCP_vN.xlam`) — versões antigas ficam na share e não quebram quem já usa.
 `VERSION` no `CalcCP.py` acompanha a lógica.
 
+## v7.0.5 — 2026-11-04 — menos chamadas às APIs (só lógica; **sem re-bake**)
+
+Nenhum resultado muda; só caem as chamadas repetidas. Teste com 45 fórmulas (5 papéis × 9 fórmulas):
+**63 → 48 chamadas, 19 s → 8 s** sem cache; reabrindo o Excel, tudo que deu certo vem do disco
+(o que ainda vai à rede são só os erros, que de propósito não ficam guardados).
+
+- **Uma chamada por papel/data/taxa:** `=cpPu`/`=cpDur`/`=cpVna` e `=cpGrossUp`/`=cpDv01`/`=cpValorFuturo`
+  usavam caches separados e repetiam a mesma consulta à B3 ou à FI. Agora compartilham a resposta.
+- **`=cpPupar` e `=cpVna` reaproveitam qualquer preço já calculado** do papel na mesma data (em qualquer
+  taxa — PU Par e VNA não dependem dela), sem ir à rede nem buscar a taxa de emissão.
+- **A fonte de cada papel fica guardada no disco (12 h):** ao reabrir o Excel, papel que só existe na
+  FI vai direto na FI — não testa a B3 antes nem faz o login dela (~3 s).
+- **Cache em disco de 12 h para data passada e cadastro** (antes 10 min para tudo). Data de hoje em
+  diante continua com 10 min.
+
 ## v7.0.4 — 2026-11-04 — chaves da FI com os nomes do banco (só lógica; **sem re-bake**)
 
 - As chaves da FI Analytics agora são lidas **só** destas variáveis de ambiente:

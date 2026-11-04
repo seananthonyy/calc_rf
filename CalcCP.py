@@ -28,7 +28,7 @@ _EXCEL_EPOCH = date_type(1899, 12, 30)
 
 # Versão da lógica (.py). O .xlam é versionado por NOME de arquivo (CalcCP_vN.xlam);
 # a lógica aqui é retrocompatível (só adiciona UDF, nunca remove/renomeia) — ver CHANGELOG.md.
-VERSION = "7.0.4"
+VERSION = "7.0.5"
 
 # Todas as UDFs têm o prefixo cp (ex.: =cpPu, =cpTaxa, =cpVna...).
 # Títulos com API (debênture, CRI/CRA, NTN-B…): via B3 → FI Analytics → bondbuilder.
@@ -39,7 +39,7 @@ try:
     from apis import (
         Preco, PuPar, TaxaOp, LimparCache, FatorDi, FonteCalculo, FonteTicker,
         CampoBond, CampoFi, FluxoCadastrado, FluxoFuturo, BcbValor, IpcaIndice,
-        ErroDetalhado,
+        ErroDetalhado, DadoSemTaxa,
     )
     import di
 except Exception as _e:
@@ -311,6 +311,10 @@ def cpPupar(ticker, data):
         return f"ERRO import: {_IMPORT_ERROR}"
     try:
         ticker = str(ticker).upper().strip()
+        # Já calculado (em qualquer taxa) nesta sessão/cache: responde sem rede nem getBondDetails.
+        conhecido = DadoSemTaxa(ticker, _data_iso(data), "pupar")
+        if conhecido is not None:
+            return float(conhecido)
         # Só para montar a chamada (o PU Par não depende da taxa): a de emissão se a B3
         # cadastra o papel; senão uma taxa qualquer, para a FI responder mesmo assim.
         taxaPct = CampoBond(ticker, "yield")
@@ -330,6 +334,9 @@ def cpVna(ticker, data, taxa=None):
         return f"ERRO import: {_IMPORT_ERROR}"
     try:
         ticker = str(ticker).upper().strip()
+        conhecido = DadoSemTaxa(ticker, _data_iso(data), "vna")
+        if conhecido is not None:
+            return float(conhecido)
         r = Preco(ticker, _data_iso(data), _resolve_taxa(ticker, taxa))
         if r and r.get("vna") is not None:
             return float(r["vna"])

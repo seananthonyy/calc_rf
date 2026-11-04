@@ -4,6 +4,19 @@
 
 Documentação técnica para o Claude Code. Leia antes de alterar qualquer coisa nesta pasta.
 
+> ## 🟢 ATUALIZAÇÃO 04/11/2026 (3) — v7.0.5: menos chamadas (só `.py`)
+> - **`_cacheBruto` (só memória)** via `_Bruto(chave, buscar)`: `_CalcPuB3Bruto` (PrecoB3 + _CalcPuB3Full),
+>   `_FiBruto` (PrecoFi + _FiFull), `_BbFull` (PrecoBb + _FiFull fallback). Os caches "pequenos" (b3pu, fipu,
+>   b3full, fifull...) continuam como eram no disco — o cru NÃO vai p/ disco (tamanho/flush).
+> - **`_porData[(tk, data)][fonte] = {pupar, vna}`**, alimentado por `_Indexar` em `_CacheSet` e na carga
+>   do disco; `DadoSemTaxa(tk, data, campo)` responde `cpPupar`/`cpVna`/`PuPar` sem rede.
+> - **Memo de fonte no disco**: `_Memo(tk, src)` grava `("fonte", tk)` no registro do disco; a carga
+>   devolve p/ `_fonteTicker`. `_Ttl(chave)`: 12 h p/ `b3bond`/`fonte` e preço/taxa com data < hoje; 10 min resto.
+>   `b3di`/`bcb`/`sidra` ficam em 10 min de propósito (CDI/índice do dia pode sair depois).
+> - Medido (5 papéis × 9 fórmulas): 63→48 chamadas, 19→8 s frio. Paralelizar NÃO ajuda: 8 chamadas
+>   simultâneas na FI levaram 2× o tempo da sequência. Keep-alive ganhou ~60 ms/chamada sem proxy —
+>   não feito (mexe no proxy do banco, não testável daqui).
+
 > ## 🟢 ATUALIZAÇÃO 04/11/2026 (2) — v7.0.4: chaves FI = nomes do banco, sem fallback
 > - `token_fianalytics_debentures` (/deb), `token_fianalytics_cri_cra` (/cr), `token_fianalytics_bond_builder`
 >   (bb), `token_fianalytics_titulos_publicos` (constante `ENV_KEY_FI_TP`, sem uso). Lidas SÓ de `os.getenv`

@@ -25,6 +25,7 @@ import tempfile
 import http.client
 import urllib.request
 import urllib.error
+from datetime import date
 from urllib.parse import urlparse, unquote
 
 from config import ENV_PATH
@@ -55,6 +56,12 @@ TIMEOUT_SEG  = 6  # timeout curto por chamada para não travar o Excel
 # Cache em disco (persiste entre reaberturas do Excel): só resultados VÁLIDOS
 # (nunca None/erro), com validade de CACHE_TTL_SEG. Fora do TTL, refaz a chamada.
 CACHE_TTL_SEG = 600  # 10 min
+# Preço/taxa de data PASSADA não muda; o cadastro (getBondDetails) e o memo de fonte quase nunca.
+# Esses ficam 12 h no disco, para reabrir o Excel sem refazer as chamadas.
+CACHE_TTL_LONGO_SEG = 12 * 3600
+_CHAVES_PRECO = {"b3pu": "b3", "fipu": "fi", "bbpu": "bb"}   # resultado de preço → fonte
+_CHAVES_DATADAS = set(_CHAVES_PRECO) | {"b3yield", "fiyield", "bbyield", "b3full", "fifull"}
+_CHAVES_ESTATICAS = {"b3bond", "fonte"}
 _CACHE_FILE = os.path.join(tempfile.gettempdir(), "calcrf_cache.json")
 
 # Gravação do cache em disco é "debounced": num recálculo em massa (F9), cada
@@ -123,7 +130,13 @@ _fonteTicker: dict = {}   # ticker(upper) -> "b3"|"fi"|"bb": qual fonte responde
 # no lugar do genérico "APIs sem resposta". As funções de rede gravam em _ultimoErro; a
 # cascata (Preco/PuPar/TaxaOp) copia para _errosTicker. Não muda nenhum resultado.
 _ultimoErro = None
-_errosTicker: dict = {}   # ticker(upper) -> {"B3": msg, "FI": msg, "bondbuilder": msg}
+_errosTicker: dict = {}
+# Resposta CRUA de cada chamada de preço, só em memória: cpPu, cpVna, cpGrossUp, cpDv01... com o
+# mesmo papel/data/taxa usam a MESMA ida à API (antes cada família tinha o seu cache e repetia).
+_cacheBruto: dict = {}
+# (ticker, dataIso) -> {fonte: {"pupar", "vna"}}: PU Par e VNA não dependem da taxa, então
+# qualquer preço já calculado do papel na data responde =cpPupar/=cpVna sem nova chamada.
+_porData: dict = {}   # ticker(upper) -> {"B3": msg, "FI": msg, "bondbuilder": msg}
 _ROTULO_DIAG = {"b3": "B3", "fi": "FI", "bb": "bondbuilder"}
 
 
@@ -200,8 +213,13 @@ def _CarregarCacheDisco():
     agora = time.time()
     for chaveStr, entrada in _LerArquivoCache().items():
         try:
-            if isinstance(entrada, dict) and agora - entrada["t"] < CACHE_TTL_SEG:
-                _cacheRespostas[tuple(entrada["k"])] = entrada["v"]
+            chave = tuple(entrada["k"])
+            if isinstance(entrada, dict) and agora - entrada["t"] < _Ttl(chave):
+                if chave[0] == "fonte":
+                    _fonteTicker[chave[1]] = entrada["v"]
+                else:
+                    _cacheRespostas[chave] = entrada["v"]
+                    _Indexar(chave, entrada["v"])
                 _discoRegistro[chaveStr] = entrada
         except Exception:
             pass
@@ -226,7 +244,7 @@ def _FlushDisco(forcado=False):
                 if atual is None or entrada.get("t", 0) > atual.get("t", 0):
                     _discoRegistro[chaveStr] = entrada
         vivos = {k: v for k, v in _discoRegistro.items()
-                 if isinstance(v, dict) and agora - v.get("t", 0) < CACHE_TTL_SEG}
+                 if isinstance(v, dict) and agora - v.get("t", 0) < _Ttl(tuple(v.get("k") or ()))}
         _discoRegistro.clear()
         _discoRegistro.update(vivos)
         tmp = _CACHE_FILE + ".tmp"
@@ -246,15 +264,68 @@ def _CacheGet(chave):
     return _cacheRespostas.get(chave, _CACHE_AUSENTE)
 
 
-def _CacheSet(chave, valor):
+def _Persistir(chave, valor):
     global _discoSujo
+    _discoRegistro["|".join(map(str, chave))] = {
+        "k": list(chave), "v": valor, "t": time.time(),
+    }
+    _discoSujo = True
+    _FlushDisco()
+
+
+def _CacheSet(chave, valor):
     _cacheRespostas[chave] = valor
+    _Indexar(chave, valor)
     if valor is not None:            # só persiste resultado válido (nunca None/erro)
-        _discoRegistro["|".join(map(str, chave))] = {
-            "k": list(chave), "v": valor, "t": time.time(),
-        }
-        _discoSujo = True
-        _FlushDisco()
+        _Persistir(chave, valor)
+
+
+def _Ttl(chave):
+    """Validade no disco: 12 h p/ cadastro, memo de fonte e preço/taxa de data passada; 10 min no resto."""
+    tipo = chave[0] if chave else None
+    if tipo in _CHAVES_ESTATICAS:
+        return CACHE_TTL_LONGO_SEG
+    if tipo in _CHAVES_DATADAS and len(chave) > 2 and str(chave[2]) < date.today().isoformat():
+        return CACHE_TTL_LONGO_SEG
+    return CACHE_TTL_SEG
+
+
+def _Bruto(chave, buscar):
+    """Resposta crua de uma chamada, cacheada SÓ em memória (inclusive None)."""
+    if chave not in _cacheBruto:
+        _cacheBruto[chave] = buscar()
+    return _cacheBruto[chave]
+
+
+def _Indexar(chave, valor):
+    """Registra PU Par/VNA de um resultado de preço em _porData (independem da taxa)."""
+    src = _CHAVES_PRECO.get(chave[0]) if chave else None
+    if src and isinstance(valor, dict) and len(chave) > 2:
+        campos = {c: valor[c] for c in ("pupar", "vna") if valor.get(c) is not None}
+        if campos:
+            _porData.setdefault((chave[1], chave[2]), {})[src] = campos
+
+
+def _Memo(tk, src):
+    """Memoriza a fonte que respondeu pelo ticker — em memória e no disco (vale 12 h), para
+    que ao reabrir o Excel um papel só-FI não teste a B3 (nem faça o login dela) de novo."""
+    if _fonteTicker.get(tk) != src:
+        _fonteTicker[tk] = src
+        _Persistir(("fonte", tk), src)
+
+
+def DadoSemTaxa(ticker, dataIso, campo):
+    """"pupar" ou "vna" do papel na data se algum preço (em QUALQUER taxa) já foi calculado nesta
+    sessão ou está no cache em disco — sem rede. Respeita a ordem do memo de fonte. float ou None."""
+    tk = str(ticker).upper().strip()
+    for t in dict.fromkeys((tk, _NormalizarTicker(tk))):
+        porFonte = _porData.get((t, dataIso))
+        if porFonte:
+            for src in _OrdemFontes(tk, ["b3", "fi", "bb"]):
+                v = (porFonte.get(src) or {}).get(campo)
+                if v is not None:
+                    return v
+    return None
 
 
 def _Abrir(req, base=None):
@@ -268,6 +339,8 @@ def LimparCache():
     _cacheRespostas.clear()
     _fonteTicker.clear()
     _errosTicker.clear()
+    _cacheBruto.clear()
+    _porData.clear()
     _discoRegistro.clear()
     _discoSujo = False
     _tokenB3 = None
@@ -354,6 +427,12 @@ def _NormalizarTicker(ticker):
     return t
 
 
+def _CalcPuB3Bruto(tk, dataIso, taxa):
+    """calcPU cru da B3 (ticker já normalizado, taxa já _Norm), 1 chamada por sessão."""
+    return _Bruto(("b3calc", tk, dataIso, taxa),
+                  lambda: _GetB3(f"{B3_BASE}/calcPU/{tk}/{dataIso}/{taxa}"))
+
+
 def PrecoB3(ticker, dataIso, taxa):
     """calcPU → {'pu': float, 'duration': anos|None} ou None. taxa em % a.a."""
     ticker = _NormalizarTicker(ticker)
@@ -363,7 +442,7 @@ def PrecoB3(ticker, dataIso, taxa):
     if cacheado is not _CACHE_AUSENTE:
         return cacheado
 
-    dados = _GetB3(f"{B3_BASE}/calcPU/{ticker}/{dataIso}/{taxa}")
+    dados = _CalcPuB3Bruto(ticker, dataIso, taxa)
     resultado = None
     if isinstance(dados, dict):
         pu    = dados.get("PU")
@@ -486,6 +565,13 @@ def _PostFiAuto(corpo):
     return None
 
 
+def _FiBruto(ticker, dataIso, taxa):
+    """/deb→/cr cru em modo rate (taxa já _Norm), 1 chamada por sessão."""
+    tk = str(ticker).upper().strip()
+    return _Bruto(("fiauto", tk, dataIso, taxa),
+                  lambda: _PostFiAuto({"ticker": tk, "date": dataIso, "rate": float(taxa)}))
+
+
 def PrecoFi(ticker, dataIso, taxa):
     """Modo rate → {'pu': m2m, 'duration': maculayDuration anos|None} ou None."""
     taxa = _Norm(taxa)
@@ -494,7 +580,7 @@ def PrecoFi(ticker, dataIso, taxa):
     if cacheado is not _CACHE_AUSENTE:
         return cacheado
 
-    dados = _PostFiAuto({"ticker": ticker, "date": dataIso, "rate": float(taxa)})
+    dados = _FiBruto(ticker, dataIso, taxa)
     resultado = None
     if isinstance(dados, dict):
         pu    = dados.get("m2m")
@@ -622,7 +708,7 @@ def PrecoBb(ticker, dataIso, taxa):
         return cacheado
 
     resultado = None
-    dados = _PostBb(ticker, dataIso, "rate", taxa)
+    dados = _BbFull(ticker, dataIso, taxa)
     if dados:
         pu    = dados.get("m2m")
         dur   = dados.get("maculayDuration")
@@ -675,7 +761,7 @@ def Preco(ticker, dataIso, taxa):
         _Falhou(None)
         r = fontes[src](tk, dataIso, taxa)
         if r:
-            _fonteTicker[tk] = src
+            _Memo(tk, src)
             return r
         _RegistrarFalha(tk, src)
     return None
@@ -688,12 +774,15 @@ def PuPar(ticker, dataIso, taxa):
     não traz o PU Par cede a vez à próxima. O PU Par não depende da taxa (VNA + juros do
     contrato), então `taxa` só serve para montar a chamada. float ou None."""
     tk = str(ticker).upper().strip()
+    conhecido = DadoSemTaxa(tk, dataIso, "pupar")
+    if conhecido is not None:
+        return conhecido
     fontes = {"b3": PrecoB3, "fi": PrecoFi, "bb": PrecoBb}
     for src in _OrdemFontes(tk, ["b3", "fi", "bb"]):
         _Falhou(None)
         r = fontes[src](tk, dataIso, taxa)
         if r and r.get("pupar") is not None:
-            _fonteTicker[tk] = src
+            _Memo(tk, src)
             return r["pupar"]
         _RegistrarFalha(tk, src)
     return None
@@ -707,7 +796,7 @@ def TaxaOp(ticker, dataIso, pu):
         _Falhou(None)
         r = fontes[src](tk, dataIso, pu)
         if r is not None:
-            _fonteTicker[tk] = src
+            _Memo(tk, src)
             return r
         _RegistrarFalha(tk, src)
     return None
@@ -831,7 +920,7 @@ def _CalcPuB3Full(ticker, dataIso, taxa):
     c = _CacheGet(chave)
     if c is not _CACHE_AUSENTE:
         return c
-    dados = _GetB3(f"{B3_BASE}/calcPU/{tk}/{dataIso}/{taxa}")
+    dados = _CalcPuB3Bruto(tk, dataIso, taxa)
     res = dados if isinstance(dados, dict) and dados.get("PU") is not None else None
     _CacheSet(chave, res)
     return res
@@ -848,7 +937,7 @@ def _FiFull(ticker, dataIso, taxa):
     c = _CacheGet(chave)
     if c is not _CACHE_AUSENTE:
         return c
-    dados = _PostFiAuto({"ticker": ticker, "date": dataIso, "rate": float(taxa)})
+    dados = _FiBruto(ticker, dataIso, taxa)
     if not (isinstance(dados, dict) and dados.get("m2m") is not None):
         dados = _BbFull(ticker, dataIso, taxa)
     res = dados if isinstance(dados, dict) and dados.get("m2m") is not None else None
@@ -857,8 +946,10 @@ def _FiFull(ticker, dataIso, taxa):
 
 
 def _BbFull(ticker, dataIso, taxa):
-    """Resposta COMPLETA do bondbuilder (modo rate) ou None."""
-    return _PostBb(ticker, dataIso, "rate", taxa)
+    """Resposta COMPLETA do bondbuilder (modo rate) ou None. 1 chamada por sessão."""
+    tk = str(ticker).upper().strip()
+    taxa = _Norm(taxa)
+    return _Bruto(("bbrate", tk, dataIso, taxa), lambda: _PostBb(tk, dataIso, "rate", taxa))
 
 
 def _FluxoFi(f):
