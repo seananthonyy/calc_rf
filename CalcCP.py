@@ -28,7 +28,7 @@ _EXCEL_EPOCH = date_type(1899, 12, 30)
 
 # Versão da lógica (.py). O .xlam é versionado por NOME de arquivo (CalcCP_vN.xlam);
 # a lógica aqui é retrocompatível (só adiciona UDF, nunca remove/renomeia) — ver CHANGELOG.md.
-VERSION = "7.0.2"
+VERSION = "7.0.3"
 
 # Todas as UDFs têm o prefixo cp (ex.: =cpPu, =cpTaxa, =cpVna...).
 # Títulos com API (debênture, CRI/CRA, NTN-B…): via B3 → FI Analytics → bondbuilder.
@@ -39,6 +39,7 @@ try:
     from apis import (
         Preco, PuPar, TaxaOp, LimparCache, FatorDi, FonteCalculo, FonteTicker,
         CampoBond, CampoFi, FluxoCadastrado, FluxoFuturo, BcbValor, IpcaIndice,
+        ErroDetalhado,
     )
     import di
 except Exception as _e:
@@ -110,6 +111,13 @@ def _resolve_taxa(ticker, taxa) -> float:
 
 def _erro(pref, e):
     return f"ERRO: {e}"
+
+
+def _sem_resposta(ticker, texto="APIs sem resposta (B3/FI)"):
+    """Mensagem de falha da cascata com o motivo real de cada fonte, quando conhecido
+    (ex.: 'ERRO: APIs sem resposta (B3/FI) — B3: HTTP 400 ... | FI: /deb HTTP 403 ...')."""
+    detalhe = ErroDetalhado(ticker)
+    return f"ERRO: {texto} — {detalhe}" if detalhe else f"ERRO: {texto}"
 
 
 def main():
@@ -196,7 +204,7 @@ def cpPu(ticker, data, taxa):
         r = Preco(ticker, _data_iso(data), _pct(taxa))
         if r and r.get("pu") is not None:
             return float(r["pu"])
-        return "ERRO: APIs sem resposta (B3/FI)"
+        return _sem_resposta(ticker)
     except Exception as e:
         return _erro("pu", e)
 
@@ -252,7 +260,7 @@ def cpTaxa(ticker, data, pu):
         t = TaxaOp(ticker, _data_iso(data), float(pu))
         if t is not None:
             return float(t) / 100
-        return "ERRO: APIs sem resposta (B3/FI)"
+        return _sem_resposta(ticker)
     except Exception as e:
         return _erro("taxa", e)
 
@@ -270,7 +278,7 @@ def cpDur(ticker, data, taxa):
         r = Preco(ticker, _data_iso(data), _pct(taxa))
         if r and r.get("duration") is not None:
             return float(r["duration"])
-        return "ERRO: APIs sem resposta (B3/FI)"
+        return _sem_resposta(ticker)
     except Exception as e:
         return _erro("dur", e)
 
@@ -309,7 +317,7 @@ def cpPupar(ticker, data):
         pupar = PuPar(ticker, _data_iso(data), float(taxaPct) if taxaPct is not None else _TAXA_SONDA)
         if pupar is not None:
             return float(pupar)
-        return "ERRO: PU Par indisponível (B3/FI)"
+        return _sem_resposta(ticker, "PU Par indisponível (B3/FI)")
     except Exception as e:
         return _erro("pupar", e)
 

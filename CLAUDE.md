@@ -4,6 +4,15 @@
 
 Documentação técnica para o Claude Code. Leia antes de alterar qualquer coisa nesta pasta.
 
+> ## 🟢 ATUALIZAÇÃO 04/11/2026 — v7.0.3: erro das UDFs de preço mostra o motivo real (só `.py`)
+> - `apis._Falhou(msg)` grava o motivo da falha de rede/HTTP/corpo em `_ultimoErro`; a cascata
+>   (`Preco`/`PuPar`/`TaxaOp`) zera antes de cada fonte e, se a fonte falha, `_RegistrarFalha` copia
+>   para `_errosTicker[tk][B3|FI|bondbuilder]`. Resultado None vindo do cache não apaga o motivo da
+>   1ª chamada. `ErroDetalhado(tk)` monta a string; `CalcCP._sem_resposta` anexa ao `ERRO:`.
+> - `_PostFiAuto` junta os motivos de `/deb` e `/cr` (`/deb HTTP 403 ...; /cr 500 ...`).
+> - Motivação: UGPQ13 (debênture fora da B3, só FI `/deb`) dá erro no banco e funciona daqui — a
+>   suspeita é a `token_fianalytics_deb` do banco; antes o erro real era engolido.
+
 > ## 🟢 ATUALIZAÇÃO 20/10/2026 (2) — v7.0.2: `CalcCP.py` recarrega `config`/`di`/`apis`/`basedados`
 > - O xlwings recarrega o módulo de UDF quando o `.py` muda no disco, **mas não as dependências**.
 >   Bundle rodado com Excel aberto → `CalcCP.py` novo + `apis` antigo em `sys.modules` → `cannot import

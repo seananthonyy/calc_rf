@@ -4,6 +4,17 @@ Versionamento: a **lógica** (`.py`) é retrocompatível; o **`.xlam` é version
 (`CalcCP_vN.xlam`) — versões antigas ficam na share e não quebram quem já usa.
 `VERSION` no `CalcCP.py` acompanha a lógica.
 
+## v7.0.3 — 2026-11-04 — mensagem de erro mostra o motivo real (só lógica; **sem re-bake**)
+
+- `=cpPu`, `=cpTaxa`, `=cpDur` e `=cpPupar`: no lugar do genérico `ERRO: APIs sem resposta (B3/FI)`,
+  a mensagem traz o que cada fonte respondeu. Ex.:
+  `ERRO: APIs sem resposta (B3/FI) — B3: HTTP 400 O codigo do ativo informado nao foi encontrado... |
+  FI: /deb HTTP 403 Forbidden; /cr 500 [ERROR] CRI_CRA registry information not found... |
+  bondbuilder: HTTP 403 Forbidden`.
+- Mostra também variável de ambiente faltando (`token_calc_b3`, chave da FI, `user_fianalytics`) e
+  erro de rede/proxy (`URLError: ...`). Nenhum resultado muda — só o texto do erro.
+- `=cpTeste()` passa a mostrar `OK v7.0.3`.
+
 ## v7.0.2 — 2026-10-20 — atualizar com o Excel aberto não derruba mais as fórmulas (só lógica; **sem re-bake**)
 
 - **Bug:** rodar o bundle da v7.0.1 com o Excel aberto fazia **todas** as fórmulas darem

@@ -119,6 +119,63 @@ _tokenB3 = None
 _cacheRespostas: dict = {}
 _fonteTicker: dict = {}   # ticker(upper) -> "b3"|"fi"|"bb": qual fonte respondeu (memo)
 
+# Diagnóstico: motivo real da última falha de cada fonte, por ticker, para as UDFs mostrarem
+# no lugar do genérico "APIs sem resposta". As funções de rede gravam em _ultimoErro; a
+# cascata (Preco/PuPar/TaxaOp) copia para _errosTicker. Não muda nenhum resultado.
+_ultimoErro = None
+_errosTicker: dict = {}   # ticker(upper) -> {"B3": msg, "FI": msg, "bondbuilder": msg}
+_ROTULO_DIAG = {"b3": "B3", "fi": "FI", "bb": "bondbuilder"}
+
+
+def _Resumo(txt, n=160):
+    """Mensagem curta de um corpo de erro: o 'errorMessage'/'message' do JSON, senão o texto."""
+    dados = txt
+    try:
+        for _ in range(2):   # a FI devolve JSON double-encoded
+            if isinstance(dados, str):
+                dados = json.loads(dados)
+    except Exception:
+        dados = txt
+    if isinstance(dados, dict):
+        msg = dados.get("errorMessage") or dados.get("message") or dados.get("error")
+        if msg:
+            cod = dados.get("statusCode")
+            return (f"{cod} " if cod and cod != 200 else "") + str(msg)[:n]
+    return " ".join(str(txt).split())[:n]
+
+
+def _MsgExcecao(e):
+    """Texto da exceção de rede: 'HTTP 403 <motivo>' ou 'Tipo: detalhe'."""
+    if isinstance(e, urllib.error.HTTPError):
+        try:
+            corpo = e.read().decode(errors="replace")
+        except Exception:
+            corpo = ""
+        return f"HTTP {e.code} {_Resumo(corpo) or e.reason}".strip()
+    return f"{type(e).__name__}: {str(e)[:160]}"
+
+
+def _Falhou(msg):
+    global _ultimoErro
+    _ultimoErro = msg
+
+
+def _RegistrarFalha(tk, src):
+    """Chamada pela cascata quando a fonte `src` não respondeu. Se a chamada nem foi à rede
+    (resultado None vindo do cache), mantém o motivo registrado da 1ª vez."""
+    erros = _errosTicker.setdefault(tk, {})
+    rotulo = _ROTULO_DIAG.get(src, src)
+    if _ultimoErro:
+        erros[rotulo] = _ultimoErro
+    else:
+        erros.setdefault(rotulo, "resposta sem valor")
+
+
+def ErroDetalhado(ticker):
+    """'B3: ... | FI: ... | bondbuilder: ...' com o motivo de cada fonte que falhou, ou ''."""
+    erros = _errosTicker.get(str(ticker).upper().strip()) or {}
+    return " | ".join(f"{k}: {erros[k]}" for k in ("B3", "FI", "bondbuilder") if k in erros)
+
 # Espelho em memória do cache de disco: chaveStr -> {"k":list, "v":valor, "t":ts}.
 # Carregado 1× no import; sincronizado com o arquivo só nos flushes (não a cada set).
 _discoRegistro: dict = {}
@@ -210,6 +267,7 @@ def LimparCache():
     global _tokenB3, _discoSujo
     _cacheRespostas.clear()
     _fonteTicker.clear()
+    _errosTicker.clear()
     _discoRegistro.clear()
     _discoSujo = False
     _tokenB3 = None
@@ -227,6 +285,7 @@ def _LoginB3():
     """Obtém o token de sessão via POST /login. Retorna o token ou None."""
     token = _Cred(ENV_TOKEN_B3, "B3_CALC_TOKEN")
     if not token:
+        _Falhou(f"variável {ENV_TOKEN_B3} não setada")
         return None
     try:
         corpo = json.dumps({"token": token}).encode()
@@ -236,8 +295,11 @@ def _LoginB3():
         )
         with _Abrir(req, B3_BASE) as resp:
             dados = json.loads(resp.read().decode())
+        if not dados.get("Authorization"):
+            _Falhou(f"login B3 sem token: {_Resumo(json.dumps(dados))}")
         return dados.get("Authorization")
-    except Exception:
+    except Exception as e:
+        _Falhou(f"login B3: {_MsgExcecao(e)}")
         return None
 
 
@@ -263,8 +325,10 @@ def _GetB3(url):
             if erro.code == 401 and tentativa == 0:
                 _tokenB3 = None
                 continue
+            _Falhou(_MsgExcecao(erro))
             return None
-        except Exception:
+        except Exception as e:
+            _Falhou(_MsgExcecao(e))
             return None
     return None
 
@@ -387,6 +451,7 @@ def _PostFi(corpo, path=FI_DEB_PATH):
     """POST num endpoint FI. Resposta é double-encoded. dict ou None."""
     chave = _ChaveFi(path)
     if not chave:
+        _Falhou("chave da FI não setada para /" + path.strip("/").split("/")[0])
         return None
     try:
         req = urllib.request.Request(
@@ -398,19 +463,25 @@ def _PostFi(corpo, path=FI_DEB_PATH):
         with _Abrir(req, FI_BASE) as resp:
             externo = json.loads(resp.read().decode())
         return json.loads(externo) if isinstance(externo, str) else externo
-    except Exception:
+    except Exception as e:
+        _Falhou(_MsgExcecao(e))
         return None
 
 
 def _PostFiAuto(corpo):
     """Tenta debênture; se não for (ex.: CRI/CRA), tenta o endpoint de CRI/CRA.
     Os dois endpoints devolvem os mesmos campos (m2m, m2mRate, ...)."""
+    motivos = []
     for path in (FI_DEB_PATH, FI_CR_PATH):
+        _Falhou(None)
         dados = _PostFi(corpo, path)
         if isinstance(dados, dict) and (
             dados.get("m2m") is not None or dados.get("m2mRate") is not None
         ):
             return dados
+        motivo = _ultimoErro or (_Resumo(json.dumps(dados)) if dados is not None else "sem resposta")
+        motivos.append(f"/{path.strip('/').split('/')[0]} {motivo}")
+    _Falhou("; ".join(motivos))
     return None
 
 
@@ -475,6 +546,7 @@ def _PostFiRaw(path, corpo):
     Retorna dict/list (double-encoded resolvido) ou None."""
     chave = _ChaveFi(path)
     if not chave:
+        _Falhou(f"variável {ENV_KEY_FI_BB} não setada")
         return None
     corpoBytes = json.dumps(corpo).encode()
     headers = {"content-type": "application/json; charset=utf-8", "accept": "*/*", "x-api-key": chave}
@@ -496,17 +568,20 @@ def _PostFiRaw(path, corpo):
         resp = conn.getresponse()
         raw = resp.read().decode()
         status = resp.status
-    except Exception:
+    except Exception as e:
+        _Falhou(_MsgExcecao(e))
         return None
     finally:
         if conn is not None:
             conn.close()
     if status >= 400:
+        _Falhou(f"HTTP {status} {_Resumo(raw)}")
         return None
     try:
         externo = json.loads(raw)
         return json.loads(externo) if isinstance(externo, str) else externo
     except Exception:
+        _Falhou(f"resposta inválida: {' '.join(raw.split())[:120]}")
         return None
 
 
@@ -514,6 +589,7 @@ def _CorpoBb(ticker, dataIso, campo, valor):
     """Corpo do bondbuilder, ou None sem o e-mail do usuário (a rota exige)."""
     email = _Cred(ENV_USER_FI, "FIANALYTICS_USER")
     if not email:
+        _Falhou(f"variável {ENV_USER_FI} não setada")
         return None
     return {"user_email": email, "bond_name": str(ticker).upper().strip(),
             "date": dataIso, "settlement_date": dataIso,
@@ -526,6 +602,8 @@ def _PostBb(ticker, dataIso, campo, valor):
     if corpo is None:
         return None
     dados = _PostFiRaw(FI_BB_PATH, corpo)
+    if dados is not None and not _BbOk(dados):
+        _Falhou(_Resumo(json.dumps(dados)))
     return dados if _BbOk(dados) else None
 
 
@@ -593,10 +671,12 @@ def Preco(ticker, dataIso, taxa):
     tk = str(ticker).upper().strip()
     fontes = {"b3": PrecoB3, "fi": PrecoFi, "bb": PrecoBb}
     for src in _OrdemFontes(tk, ["b3", "fi", "bb"]):
+        _Falhou(None)
         r = fontes[src](tk, dataIso, taxa)
         if r:
             _fonteTicker[tk] = src
             return r
+        _RegistrarFalha(tk, src)
     return None
 
 
@@ -609,10 +689,12 @@ def PuPar(ticker, dataIso, taxa):
     tk = str(ticker).upper().strip()
     fontes = {"b3": PrecoB3, "fi": PrecoFi, "bb": PrecoBb}
     for src in _OrdemFontes(tk, ["b3", "fi", "bb"]):
+        _Falhou(None)
         r = fontes[src](tk, dataIso, taxa)
         if r and r.get("pupar") is not None:
             _fonteTicker[tk] = src
             return r["pupar"]
+        _RegistrarFalha(tk, src)
     return None
 
 
@@ -621,10 +703,12 @@ def TaxaOp(ticker, dataIso, pu):
     tk = str(ticker).upper().strip()
     fontes = {"b3": TaxaB3, "fi": TaxaFi, "bb": TaxaBb}
     for src in _OrdemFontes(tk, ["b3", "fi", "bb"]):
+        _Falhou(None)
         r = fontes[src](tk, dataIso, pu)
         if r is not None:
             _fonteTicker[tk] = src
             return r
+        _RegistrarFalha(tk, src)
     return None
 
 
