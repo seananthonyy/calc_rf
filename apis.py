@@ -448,9 +448,22 @@ def _GetBtg(caminho, params):
     return None
 
 
+_RE_CETIP_TP = re.compile(r"^(760199|950199|100000|210100)\d{8}$")   # NTN-B, NTN-F, LTN, LFT
+
+
+def _EhTituloPublico(tk):
+    """Título público (NTN-B/NTN-F pelo nome amigável ou código CETIP de NTN-B/F, LTN, LFT).
+    O BTG OTC só tem crédito privado (debênture/CRI/CRA) → esses pulam o BTG sem ir à rede."""
+    t = str(tk).upper().strip()
+    return _NormalizarTicker(t) != t or bool(_RE_CETIP_TP.match(t))
+
+
 def PrecoBtg(ticker, dataIso, taxa):
     """/pricing/pu → {'pu', 'duration', 'pupar', 'vna': None} ou None. taxa em % a.a."""
     tk = str(ticker).upper().strip()
+    if _EhTituloPublico(tk):
+        _Falhou("título público (BTG só tem crédito privado)")
+        return None
     taxa = _Norm(taxa)
     chaveCache = ("btgpu", tk, dataIso, taxa)
     cacheado = _CacheGet(chaveCache)
@@ -477,6 +490,9 @@ def PrecoBtg(ticker, dataIso, taxa):
 def TaxaBtg(ticker, dataIso, pu):
     """/pricing/rate → taxa em % a.a. ou None."""
     tk = str(ticker).upper().strip()
+    if _EhTituloPublico(tk):
+        _Falhou("título público (BTG só tem crédito privado)")
+        return None
     pu = _Norm(pu)
     chaveCache = ("btgyield", tk, dataIso, pu)
     cacheado = _CacheGet(chaveCache)

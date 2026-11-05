@@ -4,6 +4,12 @@ Versionamento: a **lógica** (`.py`) é retrocompatível; o **`.xlam` é version
 (`CalcCP_vN.xlam`) — versões antigas ficam na share e não quebram quem já usa.
 `VERSION` no `CalcCP.py` acompanha a lógica.
 
+## v7.1.1 — 2026-11-05 — título público não passa mais pelo BTG (só lógica; **sem re-bake**)
+
+- O BTG OTC só tem crédito privado (debênture, CRI, CRA). NTN-B/NTN-F (nome amigável ou código CETIP) e
+  LTN/LFT (código CETIP) agora pulam o BTG sem chamar a rede e seguem FI → B3, como antes da v7.1.0.
+- O BTG fica só para PU e taxa de crédito privado. O canal de taxas live de NTN-B do BTG **não** foi integrado.
+
 ## v7.1.0 — 2026-11-05 — BTG OTC Markets como 1ª fonte; ordem BTG → FI → B3 (só lógica; **sem re-bake**)
 
 - **Ordem nova das fontes** de `=cpPu`, `=cpTaxa`, `=cpDur` e `=cpPupar`: **BTG → FI Analytics → B3 →
