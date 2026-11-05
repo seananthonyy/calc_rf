@@ -4,6 +4,16 @@
 
 Documentação técnica para o Claude Code. Leia antes de alterar qualquer coisa nesta pasta.
 
+> ## 🟢 ATUALIZAÇÃO 05/11/2026 (3) — v8.0.0: `CalcCP_v8.xlam` — `cpIncentivada` (39 UDFs); spread exponencial
+> - `cpIncentivada`: BTG `asset` + `tax_exempt` (S/N) → senão `apis.IncentivadaFi` (FI `/deb` taxa-sonda 10% em hoje:
+>   `taxedType` GROSS_UP/AFTER_TAX, `SEM_TIPO` se a FI omite o campo — TAEEB5 —, `/cr` respondendo = `CRI_CRA` → #N/A).
+>   Só debênture responde SIM/NÃO (decisão do usuário: CRI/CRA "não se aplica").
+> - `cpAnbimaSpread` IPCA+ = `(1+ind)/(1+ntnb) − 1` (usuário: spread é exponencial; igual ao `calc_spread_anbima`).
+> - Re-bake COM do DEV (removendo `xlwings_udfs` antes) → scrub `anton` (ascii + utf-16-le) → transplante do
+>   `vbaProject.bin` p/ cópia do v7. Verificado: zip íntegro, demais partes idênticas ao v7, 0 PII, 39 UDFs,
+>   `PYTHONPATH=%CALCCP_DIR%;Z:\CP`, e `=cpIncentivada("CEAP12")` → SIM rodando DENTRO do Excel (add-in v8).
+>   Script: scratchpad `rebake_v8.py` + `verificar_v8.py`.
+>
 > ## 🟢 ATUALIZAÇÃO 05/11/2026 (2) — v7.2.0: sai o `trades.db`; `cpAnbima*` e `cpEmissor` via BTG (só `.py`)
 > - O `trades.db` do secundário **não existe mais** (o projeto migrou para Parquet). Removidos: `basedados.py`,
 >   `config.ResolverTradesDb`, `TRADES_DB_PATH`, o `_DB_ERROR`/`_diag_banco` do `CalcCP.py` e o arquivo do bundle.

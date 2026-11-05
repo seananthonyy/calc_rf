@@ -4,6 +4,20 @@ Versionamento: a **lógica** (`.py`) é retrocompatível; o **`.xlam` é version
 (`CalcCP_vN.xlam`) — versões antigas ficam na share e não quebram quem já usa.
 `VERSION` no `CalcCP.py` acompanha a lógica.
 
+## v8.0.0 — 2026-11-05 — `CalcCP_v8.xlam`: `=cpIncentivada`; spread exponencial (**re-bake**)
+
+- **`.xlam` novo: `CalcCP_v8.xlam`** (v1…v7 intocados). 39 fórmulas: entra `=cpIncentivada`, sai de vez
+  `=cpAnbimaIndicativoHistorico`. Quem ficar no v7 recebe o resto da mudança (os `.py` valem para todos);
+  só `=cpIncentivada` exige o v8.
+- **`=cpIncentivada(ticker)`**: debênture incentivada (Lei 12.431)? `SIM` / `NÃO`. CRI, CRA e título
+  público → `#N/A` (não se aplica). Fonte: campo de isenção do cadastro do BTG → FI Analytics (tipo
+  fiscal no endpoint de debênture: `GROSS_UP` = isenta). Os dois bateram em 10 de 10 papéis. Sem BTG, a
+  FI não conhece alguns papéis (LIGHB6) e não informa o tipo de outros (TAEEB5): nesses dá erro explícito.
+  Corrige a regra do relatório do secundário ("IPCA ou PRÉ = 12.431"), que erra em 134 debêntures.
+- **`=cpAnbimaSpread` em IPCA+ passou a ser exponencial**: `(1 + indicativa) / (1 + taxa da NTN-B de
+  referência) − 1`, a mesma conta do projeto de negociação secundária (antes: diferença simples).
+  CEAP12 em 05/11: 29,65 → 27,50 bps.
+
 ## v7.2.1 — 2026-11-05 — sai `=cpAnbimaIndicativoHistorico` (só lógica; **sem re-bake**)
 
 - A fórmula foi **removida** do código (pedido do usuário): não há fonte de histórico de indicativas.

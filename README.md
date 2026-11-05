@@ -40,7 +40,7 @@ as fórmulas **ANBIMA** (`=cpAnbima…`) vêm do cadastro do **BTG OTC Markets**
    `.xlam` lê a pasta da variável de ambiente **`CALCCP_DIR`** (com fallback para `Z:\CP`,
    se a variável não estiver setada — ver [passo 2](#2-variáveis-de-ambiente-do-usuário-segredos--proxy--pasta)).
    Assim cada PC pode apontar para onde a pasta estiver (share com letra diferente, cópia local etc.).
-   Conteúdo mínimo da pasta: `CalcCP_v7.xlam`, `CalcCP.py`, `apis.py`, `di.py`,
+   Conteúdo mínimo da pasta: `CalcCP_v8.xlam`, `CalcCP.py`, `apis.py`, `di.py`,
    `config.py`, `feriados_anbima.csv`. Puxar do repositório do projeto (ou extrair o `CalcCP_bundle.py`).
 
 ---
@@ -91,10 +91,10 @@ Excel → Opções → **Central de Confiabilidade** → Configurações de Macr
 
 ### 4. Habilitar o add-in
 Excel → Opções → **Suplementos** → "Suplementos do Excel" → **Ir...** → **Procurar** →
-selecionar `Z:\CP\CalcCP_v7.xlam` → OK. (Quem já usa o `CalcCP_v1.xlam`…`_v6.xlam`
-continua funcionando; migrar = desmarcar o antigo e procurar o v7. Os `.xlam` antigos **não são
+selecionar `Z:\CP\CalcCP_v8.xlam` → OK. (Quem já usa o `CalcCP_v1.xlam`…`_v7.xlam`
+continua funcionando; migrar = desmarcar o antigo e procurar o v8. Os `.xlam` antigos **não são
 tocados** — ficam na pasta do lado do novo. As fórmulas `=cpAnbima…` existem a partir do **v3**;
-o `=cpAnbimaSpread`, só no **v4**; o `=cpEmissor`, só no **v6**; o `=cpValorFuturo`, só no **v7**.)
+o `=cpAnbimaSpread`, só no **v4**; o `=cpEmissor`, só no **v6**; o `=cpValorFuturo`, só no **v7**; o `=cpIncentivada`, só no **v8**.)
 As UDFs já vêm **registradas** no `.xlam` (não precisa "Import Functions"). Aparece a aba
 **CalcCP** no ribbon, com o botão **Sobre** — que mostra a versão da lógica, a pasta de onde o
 add-in está lendo, o Python em uso e o estado do import. Como ele roda o Python de verdade
@@ -120,11 +120,11 @@ Esse arquivo é **por PC e por usuário** (não vai pro repositório).
 ### 6. Testar
 Feche e reabra o Excel:
 ```
-=cpTeste()                              -> OK v7.2.0 — path: Z:\CP — CALCCP_DIR=Z:\CP
+=cpTeste()                              -> OK v8.0.0 — path: Z:\CP — CALCCP_DIR=Z:\CP
 =cpPu("FGEN13"; "13/06/2025"; 6,4686%)  -> ~961,70
 =cpPu("DI1F27"; "01/07/2026"; 10%)      -> ~95310,20   (DI, cálculo local)
 =cpAnbimaRef("CEAP12")                  -> NTN-B 30    (BTG, última divulgação ANBIMA)
-=cpAnbimaSpread("CEAP12")               -> 0,002965    (= 29,65 bps sobre a NTN-B 30, em 05/11/2026)
+=cpAnbimaSpread("CEAP12")               -> 0,00275     (= 27,5 bps sobre a NTN-B 30, em 05/11/2026)
 ```
 
 ### Checklist (por PC)
@@ -172,6 +172,7 @@ Feche e reabra o Excel:
 | `=cpTaxaEmissao(ticker)` | Taxa de emissão em **decimal** (6,4618% → 0,064618; %DI → 1,135) |
 | `=cpVne(ticker)` | Valor Nominal de Emissão |
 | `=cpAniversario(ticker)` | Dia de aniversário |
+| `=cpIncentivada(ticker)` | Debênture incentivada (Lei 12.431)? `SIM` / `NÃO`. CRI, CRA e título público → `#N/A` (não se aplica). BTG → FI |
 | `=cpEmissor(ticker)` | Nome do emissor — o **risco**. BTG primeiro (em CRI/CRA vem o **devedor**, ex.: `UNIDAS`); sem BTG, B3 (que em CRI/CRA devolve a securitizadora). Sem nenhum → `ERRO: emissor indisponível (BTG/B3)` |
 
 > `cpFluxo` × `cpFluxoCompleto`: as duas vêm da **agenda cadastrada** na B3 (`getBondDetails`) e trazem
@@ -200,7 +201,7 @@ indicativa idêntica à ANBIMA em 1.183 debêntures. Precisa de `token_btg_otc`.
 |---|---|
 | `=cpAnbimaRef(ticker)` | Referência do papel: `NTN-B 30` (IPCA+, a NTN-B que a ANBIMA usa) ou `FUNDING` (DI+/%DI). Papel PRÉ → `#N/A` (o BTG não traz a ref DI1) |
 | `=cpAnbimaIndicativo(ticker)` | Taxa indicativa ANBIMA da **última divulgação**, em **decimal** (formate como %) |
-| `=cpAnbimaSpread(ticker)` | **Spread** sobre a referência, em **decimal**. IPCA+: indicativa − taxa da NTN-B de referência (mesma divulgação). `FUNDING`: a própria indicativa |
+| `=cpAnbimaSpread(ticker)` | **Spread** sobre a referência, em **decimal**. IPCA+: **exponencial**, `(1 + indicativa) / (1 + taxa da NTN-B de referência) − 1` (mesma divulgação; mesma conta do secundário). `FUNDING`: a própria indicativa. PRÉ: `#N/A` |
 
 > **Sem data:** o BTG só entrega a última divulgação da ANBIMA (D-1); não dá para pedir uma data.
 >
@@ -279,10 +280,11 @@ renomeia** (senão quebra planilhas e `.xlam` antigos). O **`.xlam` é versionad
 | fórmulas não calculam, PC com vários Python | add-in pegou o Python errado | passo 5 (fixar `Interpreter`) |
 | `ERRO: APIs sem resposta (B3/FI)` | faltam env vars / proxy | passo 2 |
 | `ERRO: BTG sem resposta` nas `=cpAnbima…` | sem `token_btg_otc`, ou a rede bloqueia o domínio do BTG | setar `token_btg_otc` (passo 2), reabrir o Excel e `=cpLimparCache()` |
-| `#NAME?` só nas `=cpAnbima…` | add-in registrado é o `_v1`/`_v2` (não têm essas fórmulas) | registrar o `CalcCP_v7.xlam` (passo 4) |
-| `#NAME?` só em `=cpAnbimaSpread` (as outras `=cpAnbima…` funcionam) | add-in registrado é o `_v3` — a UDF nova só existe no v4 | registrar o `CalcCP_v7.xlam` (passo 4). A coluna Spread do histórico já funciona no v3, porque depende só dos `.py` |
-| `#NAME?` só em `=cpEmissor` | add-in registrado é o `_v5` ou anterior — a UDF só existe no v6 | registrar o `CalcCP_v7.xlam` (passo 4) |
-| `#NAME?` só em `=cpValorFuturo` | add-in registrado é o `_v6` ou anterior — a UDF só existe no v7 | registrar o `CalcCP_v7.xlam` (passo 4) |
+| `#NAME?` só nas `=cpAnbima…` | add-in registrado é o `_v1`/`_v2` (não têm essas fórmulas) | registrar o `CalcCP_v8.xlam` (passo 4) |
+| `#NAME?` só em `=cpAnbimaSpread` (as outras `=cpAnbima…` funcionam) | add-in registrado é o `_v3` — a UDF nova só existe no v4 | registrar o `CalcCP_v8.xlam` (passo 4). A coluna Spread do histórico já funciona no v3, porque depende só dos `.py` |
+| `#NAME?` só em `=cpEmissor` | add-in registrado é o `_v5` ou anterior — a UDF só existe no v6 | registrar o `CalcCP_v8.xlam` (passo 4) |
+| `#NAME?` só em `=cpValorFuturo` | add-in registrado é o `_v6` ou anterior — a UDF só existe no v7 | registrar o `CalcCP_v8.xlam` (passo 4) |
+| `#NAME?` só em `=cpIncentivada` | add-in registrado é o `_v7` ou anterior — a UDF só existe no v8 | registrar o `CalcCP_v8.xlam` (passo 4) |
 | `cannot import name '...' from 'apis'` em TODAS as fórmulas | bundle rodado com o Excel aberto: o Python do Excel ficou com o `apis.py` antigo na memória (corrigido na v7.0.2 — só acontece ao atualizar **a partir** de uma versão anterior a ela) | fechar o Excel inteiro, finalizar os `pythonw.exe` no Gerenciador de Tarefas e reabrir |
 | `Input past end of file` | `myaddin.conf` com linha em branco sobrando | recriar com o snippet do passo 5 |
 | aba não aparece / `#NAME?` | add-in não habilitado ou VBA não liberado | passos 3 e 4 |

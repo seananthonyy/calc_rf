@@ -28,7 +28,7 @@ _EXCEL_EPOCH = date_type(1899, 12, 30)
 
 # Versão da lógica (.py). O .xlam é versionado por NOME de arquivo (CalcCP_vN.xlam);
 # a lógica aqui é retrocompatível (só adiciona UDF, nunca remove/renomeia) — ver CHANGELOG.md.
-VERSION = "7.2.1"
+VERSION = "8.0.0"
 
 # Todas as UDFs têm o prefixo cp (ex.: =cpPu, =cpTaxa, =cpVna...).
 # Títulos com API (debênture, CRI/CRA, NTN-B…): via BTG → FI Analytics → B3 → bondbuilder.
@@ -39,7 +39,7 @@ try:
     from apis import (
         Preco, PuPar, Vna, TaxaOp, LimparCache, FatorDi, FonteCalculo, FonteTicker,
         CampoBond, CampoFi, FluxoCadastrado, FluxoFuturo, BcbValor, IpcaIndice,
-        ErroDetalhado, DadoSemTaxa, CadastroBtg, CampoBtg, UltimoErro,
+        ErroDetalhado, DadoSemTaxa, CadastroBtg, CampoBtg, UltimoErro, IncentivadaFi,
     )
     import di
 except Exception as _e:
@@ -586,9 +586,10 @@ def cpAnbimaIndicativo(ticker):
 @xw.func
 def cpAnbimaSpread(ticker):
     """Spread da indicativa ANBIMA sobre a referência de =cpAnbimaRef, em DECIMAL
-    (-0,005193 = -51,93 bps). IPCA+: indicativa − taxa da NTN-B de referência (as duas da
-    mesma divulgação ANBIMA, via BTG). DI+/%DI (FUNDING): o spread É a própria indicativa.
-    #N/A se faltar a indicativa ou a referência."""
+    (0,00275 = 27,5 bps). IPCA+: spread EXPONENCIAL (1 + indicativa) / (1 + taxa da NTN-B de
+    referência) − 1 — mesma conta do projeto de negociação secundária; as duas taxas são da
+    mesma divulgação ANBIMA, via BTG. DI+/%DI (FUNDING): o spread É a própria indicativa.
+    #N/A se faltar a indicativa ou a referência (papel PRÉ: o BTG não traz a ref DI1)."""
     if _IMPORT_ERROR:
         return f"ERRO import: {_IMPORT_ERROR}"
     try:
@@ -603,9 +604,47 @@ def cpAnbimaSpread(ticker):
         ntnb = cad.get("ntnb_target_price")
         if _vazio_btg(ntnb):
             return _NA
-        return float(f"{(float(ind) - float(ntnb)) / 100:.10g}")
+        spread = (1 + float(ind) / 100) / (1 + float(ntnb) / 100) - 1
+        return float(f"{spread:.10g}")
     except Exception as e:
         return _erro("anbimaSpread", e)
+
+
+@xw.func
+def cpIncentivada(ticker):
+    """Debênture incentivada (Lei 12.431)? "SIM" / "NÃO".
+    Só vale para DEBÊNTURE: CRI, CRA e título público devolvem #N/A (a pergunta não se aplica).
+    Fonte: BTG (campo de isenção do cadastro) → FI Analytics (tipo fiscal no endpoint de debênture:
+    GROSS_UP = isenta, AFTER_TAX = tributada; os dois bateram em 10 de 10 papéis em 05/11/2026)."""
+    if _IMPORT_ERROR:
+        return f"ERRO import: {_IMPORT_ERROR}"
+    try:
+        tk = str(ticker).upper().strip()
+        cad = CadastroBtg(tk)
+        if cad:
+            if cad.get("asset") in ("CRI", "CRA"):
+                return _NA
+            if cad.get("asset") == "DEBENTURES" and cad.get("tax_exempt") in ("S", "N"):
+                return "SIM" if cad["tax_exempt"] == "S" else "NÃO"
+        elif cad == {} and _parece_titulo_publico(tk):
+            return _NA
+        tipo = IncentivadaFi(tk)
+        if tipo in ("GROSS_UP", "AFTER_TAX"):
+            return "SIM" if tipo == "GROSS_UP" else "NÃO"
+        if tipo == "CRI_CRA":
+            return _NA
+        if tipo == "SEM_TIPO":
+            return "ERRO: a FI não informa o tipo fiscal desta debênture (e o BTG não respondeu)"
+        motivo = UltimoErro()
+        return "ERRO: não encontrada como debênture (BTG/FI)" + (f" — {motivo}" if motivo else "")
+    except Exception as e:
+        return _erro("incentivada", e)
+
+
+def _parece_titulo_publico(tk):
+    """NTN-B/NTN-F/LTN/LFT (nome ou código CETIP) — usa a mesma regra do apis."""
+    import apis
+    return apis._EhTituloPublico(tk)
 
 
 # =============================================================================

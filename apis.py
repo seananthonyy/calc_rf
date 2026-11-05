@@ -542,6 +542,34 @@ def CampoBtg(ticker, campo):
     return None if v in _VAZIOS_BTG or (isinstance(v, str) and v.strip() in _VAZIOS_BTG) else v
 
 
+def IncentivadaFi(ticker):
+    """Tipo fiscal pela FI, para o =cpIncentivada quando o BTG não sabe. Devolve:
+    'GROSS_UP' (debênture isenta) | 'AFTER_TAX' (debênture tributada) | 'SEM_TIPO' (a FI conhece a
+    debênture mas não manda o campo — ex.: TAEEB5) | 'CRI_CRA' (o /cr respondeu) | None (nenhum dos
+    dois conhece o papel, ou falha de rede — motivo em UltimoErro()).
+    O tipo fiscal não depende da taxa nem da data: vai uma taxa-sonda de 10% em hoje."""
+    tk = str(ticker).upper().strip()
+    if _EhTituloPublico(tk):
+        return None
+    chave = ("fiincent", tk)
+    c = _CacheGet(chave)
+    if c is not _CACHE_AUSENTE:
+        return c
+    corpo = {"ticker": tk, "date": date.today().isoformat(), "rate": 10.0}
+    _Falhou(None)
+    res = None
+    dados = _PostFi(corpo, FI_DEB_PATH)
+    if isinstance(dados, dict) and dados.get("m2m") is not None:
+        tipo = dados.get("taxedType")
+        res = tipo if tipo in ("GROSS_UP", "AFTER_TAX") else "SEM_TIPO"
+    else:
+        dados = _PostFi(corpo, FI_CR_PATH)
+        if isinstance(dados, dict) and dados.get("m2m") is not None:
+            res = "CRI_CRA"
+    _CacheSet(chave, res)
+    return res
+
+
 def UltimoErro():
     """Motivo da última falha de rede registrada (texto) ou None."""
     return _ultimoErro

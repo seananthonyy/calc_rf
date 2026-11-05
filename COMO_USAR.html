@@ -106,6 +106,7 @@
       <tr><td class="f">cpTaxaEmissao</td><td>Taxa de emissão <span class="tag">vem 0,064686 → formate como %</span></td><td><code>=cpTaxaEmissao("FGEN13")</code></td><td class="src">B3</td></tr>
       <tr><td class="f">cpVne</td><td>Valor nominal de emissão</td><td><code>=cpVne("FGEN13")</code> → <span class="res">1000</span></td><td class="src">B3</td></tr>
       <tr><td class="f">cpAniversario</td><td>Dia do aniversário do papel</td><td><code>=cpAniversario("FGEN13")</code> → <span class="res">15</span></td><td class="src">B3</td></tr>
+      <tr><td class="f">cpIncentivada</td><td>Debênture incentivada (Lei 12.431)? SIM / NÃO <span class="tag">CRI/CRA → #N/A</span></td><td><code>=cpIncentivada("CEAP12")</code> → <span class="res">SIM</span></td><td class="src">BTG → FI</td></tr>
       <tr><td class="f">cpEmissor</td><td>Nome do emissor — o risco <span class="tag">CRI/CRA → devedor</span></td><td><code>=cpEmissor("CRA021001KB")</code> → <span class="res">UNIDAS</span></td><td class="src">BTG → B3</td></tr>
       <tr><td class="f">cpVna</td><td>VNA — valor nominal atualizado na data</td><td><code>=cpVna("FGEN13";"13/06/2025")</code></td><td class="src">FI Analytics / B3</td></tr>
       <tr><td class="f">cpPupar</td><td>PU Par (valor nominal + juros acumulados)</td><td><code>=cpPupar("FGEN13";"13/06/2025")</code></td><td class="src">BTG / FI Analytics / B3</td></tr>
@@ -154,8 +155,8 @@
           <td><code>=cpAnbimaRef("CEAP12")</code> → <span class="res">NTN-B 30</span></td><td class="src">BTG / ANBIMA</td></tr>
       <tr><td class="f">cpAnbimaIndicativo</td><td>Taxa indicativa ANBIMA da <b>última divulgação</b></td>
           <td><code>=cpAnbimaIndicativo("CEAP12")</code> → <span class="res">0,081227</span> (= 8,1227%)</td><td class="src">BTG / ANBIMA</td></tr>
-      <tr><td class="f">cpAnbimaSpread</td><td><b>Spread</b> sobre a referência (IPCA+: indicativa − taxa da NTN-B)</td>
-          <td><code>=cpAnbimaSpread("CEAP12")</code> → <span class="res">0,002965</span> (= 29,65 bps)</td><td class="src">BTG / ANBIMA</td></tr>
+      <tr><td class="f">cpAnbimaSpread</td><td><b>Spread</b> sobre a referência (IPCA+: (1+indicativa)/(1+NTN-B) − 1)</td>
+          <td><code>=cpAnbimaSpread("CEAP12")</code> → <span class="res">0,00275</span> (= 27,5 bps)</td><td class="src">BTG / ANBIMA</td></tr>
     </table>
     <p class="sub"><b>Sobre o spread:</b> quando a referência é <code>FUNDING</code> (papéis DI+ e %DI)
       o spread <b>é a própria taxa indicativa</b>. Papel prefixado dá <b>#N/A</b> na referência e no spread.</p>
