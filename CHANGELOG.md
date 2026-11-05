@@ -4,6 +4,31 @@ Versionamento: a **lógica** (`.py`) é retrocompatível; o **`.xlam` é version
 (`CalcCP_vN.xlam`) — versões antigas ficam na share e não quebram quem já usa.
 `VERSION` no `CalcCP.py` acompanha a lógica.
 
+## v8.1.0 — 2026-11-05 — add-in ~26× mais rápido no Excel; `=cpBreakeven` (`CalcCP_v8.xlam` **regerado**)
+
+O `CalcCP_v8.xlam` foi **regerado com o mesmo nome** (o banco ainda está no v7, então ninguém usava o v8).
+
+- **Desempenho — medido num Excel real, 600 células com referência de célula, resultado já em cache:
+  ~50 ms → ~1,9 ms por célula** (recálculo completo de 30 s → 1,2 s). Resultados idênticos ao v8.0.0
+  em 24 fórmulas com casos de borda (data digitada, célula vazia, `#N/A`, faixa, spill). Três causas:
+  1. **VBA do xlwings (`XLPy`)**: a cada célula ele remontava o comando do Python — ~15 leituras de
+     configuração, cada uma relendo a aba `xlwings.conf` e procurando arquivos `.conf` na pasta da
+     planilha e do usuário. Agora monta uma vez por sessão (~36 → ~1,9 ms por célula, sozinho).
+  2. **Casquinhas das fórmulas**: passavam a CÉLULA (objeto Range) ao Python, que precisava voltar ao
+     Excel para ler cada argumento. Agora passam o valor (`Value2`; data vira o serial, que o CalcCP
+     já aceitava). Faixa de várias células continua indo como Range (~17 → ~1,9 ms).
+  3. **Python**: o xlwings conferia a data do `CalcCP.py` (`getmtime`, ida à share `Z:\CP`) a cada
+     célula; agora no máximo a cada 3 s. A atualização a quente continua funcionando.
+  Os itens 1 e 2 estão no `.xlam` (só quem registrar o v8 ganha); o 3 vale para qualquer `.xlam`.
+- **Ticker vazio ou com erro** (`#N/A`, `#REF!`) responde na hora `ERRO: ticker vazio (ou célula com
+  erro)`. Antes virava o texto `NONE` e consultava BTG, FI, B3 e bondbuilder (1 a 4 s) por célula.
+- **Cadastro do BTG em lote**: até o 4º papel diferente vai papel a papel (0,2 s); a partir do 5º baixa
+  o cadastro inteiro uma vez (~1,4 s) e responde o resto da memória (`cpEmissor`, `cpIncentivada`,
+  `cpAnbima*`, `cpBreakeven`).
+- **`=cpBreakeven(ticker)`** (fórmula nova): taxa `break_even_rate` do cadastro do BTG, em decimal.
+  ⚠️ O BTG não documenta o que ela é; ~920 debêntures (DI+ e IPCA+) têm, e em ~40% delas é a taxa de
+  emissão. `#N/A` sem o campo.
+
 ## v8.0.0 — 2026-11-05 — `CalcCP_v8.xlam`: `=cpIncentivada`; spread exponencial (**re-bake**)
 
 - **`.xlam` novo: `CalcCP_v8.xlam`** (v1…v7 intocados). 39 fórmulas: entra `=cpIncentivada`, sai de vez

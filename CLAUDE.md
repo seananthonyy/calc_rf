@@ -4,6 +4,26 @@
 
 Documentação técnica para o Claude Code. Leia antes de alterar qualquer coisa nesta pasta.
 
+> ## 🟢 ATUALIZAÇÃO 05/11/2026 (4) — v8.1.0: desempenho + `cpBreakeven` (40 UDFs) — `CalcCP_v8.xlam` REGERADO (mesmo nome)
+> - Usuário: manter o nome v8 (o banco ainda está no v7) → o `.xlam` foi sobrescrito e o `VERSION` ficou 8.1.0.
+> - ⚠️ **O VBA do `.xlam` agora tem 2 alterações nossas sobre o xlwings — TODO re-bake precisa reaplicá-las**
+>   (o `import_udfs` regera o `xlwings_udfs` do zero; o módulo `xlwings` fica, mas some se trocar o DEV):
+>   1. `xlwings.XLPy()` com `Static comandoPy`: `XLPyLoadDLL` + `XLPyCommand` só na 1ª chamada da sessão.
+>      Seguro porque `ADD_WORKBOOK_TO_PYTHONPATH=false` (o comando não depende da planilha ativa).
+>   2. `xlwings_udfs`: toda casquinha chama `Array(CpValor(a), CpValor(b), …)`; `CpValor` (no fim do módulo)
+>      devolve `.Value2` de célula única e o próprio Range se for faixa.
+>   **Use o `rebake.py` (versionado):** `python rebake.py CalcCP_v8.xlam CalcCP_v9.xlam` regera as casquinhas,
+>   reaplica as 2 alterações, tira o usuário do Windows do `.bin` e transplanta p/ cópia do xlam-base.
+>   Conferido: gera 40 UDFs com `CpValor` e 0 PII. (Validação desta versão: comparação de 24 fórmulas entre
+>   v8.0.0 e v8.1.0 num Excel real, 0 diferenças; benchmark com 600 células.)
+> - Medido (Excel real, 600 células c/ referência, cache quente): v8.0.0 ~50 ms/célula → v8.1.0 ~1,9 ms.
+>   Só o item 1: ~36 → ~1,9 ms em células sem referência. O resto (~1,9 ms) é o transporte COM do xlwings.
+> - Python: `_AcelerarXlwings()` troca `xlwings.udfs.get_udf_module` por uma versão que só confere o
+>   `getmtime` do `CalcCP.py` a cada `_RECHECAR_SEG` (3 s) — idempotente no reload (atributo `_calccp`).
+>   `_GuardaTicker` (fim do `CalcCP.py`) envolve toda UDF cujo 1º arg é `ticker`: None/""/código de erro
+>   do Excel → erro imediato, sem rede. `apis.CadastroBtg`: a partir do 5º papel (`_BTG_CAD_LIMIAR`) baixa
+>   o cadastro inteiro (`_CadastroBtgInteiro`, timeout 30 s, validade 10 min).
+>
 > ## 🟢 ATUALIZAÇÃO 05/11/2026 (3) — v8.0.0: `CalcCP_v8.xlam` — `cpIncentivada` (39 UDFs); spread exponencial
 > - `cpIncentivada`: BTG `asset` + `tax_exempt` (S/N) → senão `apis.IncentivadaFi` (FI `/deb` taxa-sonda 10% em hoje:
 >   `taxedType` GROSS_UP/AFTER_TAX, `SEM_TIPO` se a FI omite o campo — TAEEB5 —, `/cr` respondendo = `CRI_CRA` → #N/A).
@@ -371,6 +391,9 @@ Depois de instalado, a aba do ribbon aparece como **CalcCP**.
 3. O usuário pega a mudança ao **reabrir o Excel** (o Python recarrega o módulo no novo processo).
 
 ### Adicionar/renomear UDF, mudar argumentos, ou trocar sync↔async — precisa RE-GERAR o `.xlam`
+> ⚠️ Desde a v8.1.0: depois do `import_udfs`, reaplicar as 2 alterações de desempenho no VBA (ver o
+> banner da v8.1.0 no topo). Sem elas o add-in volta a ~50 ms por célula.
+
 O módulo `xlwings_udfs` (as casquinhas VBA) é **baked no `.xlam`** e difere conforme a assinatura e o
 `async_mode` das funções (ver `udfs.py`, `generate_vba_wrapper`, ~linha 515). Então mudar isso exige
 regenerar o `xlwings_udfs`. Duas formas:

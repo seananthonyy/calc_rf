@@ -15,3 +15,6 @@ __pycache__/
 # Artefato temporário do processo de higienização do .xlam
 *.clean.xlam
 CalcCP_DEV.xlam
+
+# Backup que o rebake.py faz do DEV antes de mexer
+*.bak

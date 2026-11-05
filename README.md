@@ -94,7 +94,7 @@ Excel → Opções → **Suplementos** → "Suplementos do Excel" → **Ir...** 
 selecionar `Z:\CP\CalcCP_v8.xlam` → OK. (Quem já usa o `CalcCP_v1.xlam`…`_v7.xlam`
 continua funcionando; migrar = desmarcar o antigo e procurar o v8. Os `.xlam` antigos **não são
 tocados** — ficam na pasta do lado do novo. As fórmulas `=cpAnbima…` existem a partir do **v3**;
-o `=cpAnbimaSpread`, só no **v4**; o `=cpEmissor`, só no **v6**; o `=cpValorFuturo`, só no **v7**; o `=cpIncentivada`, só no **v8**.)
+o `=cpAnbimaSpread`, só no **v4**; o `=cpEmissor`, só no **v6**; o `=cpValorFuturo`, só no **v7**; o `=cpIncentivada` e o `=cpBreakeven`, só no **v8** — que também deixa o recálculo ~26× mais rápido.)
 As UDFs já vêm **registradas** no `.xlam` (não precisa "Import Functions"). Aparece a aba
 **CalcCP** no ribbon, com o botão **Sobre** — que mostra a versão da lógica, a pasta de onde o
 add-in está lendo, o Python em uso e o estado do import. Como ele roda o Python de verdade
@@ -120,7 +120,7 @@ Esse arquivo é **por PC e por usuário** (não vai pro repositório).
 ### 6. Testar
 Feche e reabra o Excel:
 ```
-=cpTeste()                              -> OK v8.0.0 — path: Z:\CP — CALCCP_DIR=Z:\CP
+=cpTeste()                              -> OK v8.1.0 — path: Z:\CP — CALCCP_DIR=Z:\CP
 =cpPu("FGEN13"; "13/06/2025"; 6,4686%)  -> ~961,70
 =cpPu("DI1F27"; "01/07/2026"; 10%)      -> ~95310,20   (DI, cálculo local)
 =cpAnbimaRef("CEAP12")                  -> NTN-B 30    (BTG, última divulgação ANBIMA)
@@ -172,6 +172,7 @@ Feche e reabra o Excel:
 | `=cpTaxaEmissao(ticker)` | Taxa de emissão em **decimal** (6,4618% → 0,064618; %DI → 1,135) |
 | `=cpVne(ticker)` | Valor Nominal de Emissão |
 | `=cpAniversario(ticker)` | Dia de aniversário |
+| `=cpBreakeven(ticker)` | Taxa de break-even do BTG (`break_even_rate`), em decimal. ⚠️ significado não documentado pelo BTG; só ~920 debêntures têm. `#N/A` sem o campo |
 | `=cpIncentivada(ticker)` | Debênture incentivada (Lei 12.431)? `SIM` / `NÃO`. CRI, CRA e título público → `#N/A` (não se aplica). BTG → FI |
 | `=cpEmissor(ticker)` | Nome do emissor — o **risco**. BTG primeiro (em CRI/CRA vem o **devedor**, ex.: `UNIDAS`); sem BTG, B3 (que em CRI/CRA devolve a securitizadora). Sem nenhum → `ERRO: emissor indisponível (BTG/B3)` |
 
@@ -284,7 +285,7 @@ renomeia** (senão quebra planilhas e `.xlam` antigos). O **`.xlam` é versionad
 | `#NAME?` só em `=cpAnbimaSpread` (as outras `=cpAnbima…` funcionam) | add-in registrado é o `_v3` — a UDF nova só existe no v4 | registrar o `CalcCP_v8.xlam` (passo 4). A coluna Spread do histórico já funciona no v3, porque depende só dos `.py` |
 | `#NAME?` só em `=cpEmissor` | add-in registrado é o `_v5` ou anterior — a UDF só existe no v6 | registrar o `CalcCP_v8.xlam` (passo 4) |
 | `#NAME?` só em `=cpValorFuturo` | add-in registrado é o `_v6` ou anterior — a UDF só existe no v7 | registrar o `CalcCP_v8.xlam` (passo 4) |
-| `#NAME?` só em `=cpIncentivada` | add-in registrado é o `_v7` ou anterior — a UDF só existe no v8 | registrar o `CalcCP_v8.xlam` (passo 4) |
+| `#NAME?` só em `=cpIncentivada` / `=cpBreakeven` | add-in registrado é o `_v7` ou anterior — as UDFs só existem no v8 | registrar o `CalcCP_v8.xlam` (passo 4) |
 | `cannot import name '...' from 'apis'` em TODAS as fórmulas | bundle rodado com o Excel aberto: o Python do Excel ficou com o `apis.py` antigo na memória (corrigido na v7.0.2 — só acontece ao atualizar **a partir** de uma versão anterior a ela) | fechar o Excel inteiro, finalizar os `pythonw.exe` no Gerenciador de Tarefas e reabrir |
 | `Input past end of file` | `myaddin.conf` com linha em branco sobrando | recriar com o snippet do passo 5 |
 | aba não aparece / `#NAME?` | add-in não habilitado ou VBA não liberado | passos 3 e 4 |

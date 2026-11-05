@@ -23,12 +23,44 @@ for _nome in ("config", "di", "apis"):
         except Exception:
             pass   # se falhar, o import abaixo reporta o erro de verdade em _IMPORT_ERROR
 
+# O xlwings confere a data de modificação do CalcCP.py a CADA célula calculada (os.path.getmtime em
+# xlwings.udfs.get_udf_module), para recarregar o código se o arquivo mudou. Com a pasta numa share de
+# rede (Z:\CP) isso é uma ida ao servidor de arquivos por célula. Aqui a conferência passa a valer por
+# _RECHECAR_SEG: a atualização a quente continua funcionando, só demora até isso para ser percebida.
+_RECHECAR_SEG = 3.0
+
+
+def _AcelerarXlwings():
+    try:
+        import time as _time
+        from xlwings import udfs as _udfs
+    except Exception:
+        return
+    if getattr(_udfs.get_udf_module, "_calccp", False):
+        return                      # já instalado (o reload do CalcCP.py roda isto de novo)
+    original = _udfs.get_udf_module
+    conferido = {}
+
+    def get_udf_module(module_name, xl_workbook):
+        info = _udfs.udf_modules.get(module_name)
+        agora = _time.monotonic()
+        if info is not None and agora - conferido.get(module_name, -1e9) < _RECHECAR_SEG:
+            return info["module"]
+        conferido[module_name] = agora
+        return original(module_name, xl_workbook)
+
+    get_udf_module._calccp = True
+    _udfs.get_udf_module = get_udf_module
+
+
+_AcelerarXlwings()
+
 # Epoch do serial de datas do Excel (Windows): base efetiva 30/12/1899.
 _EXCEL_EPOCH = date_type(1899, 12, 30)
 
 # Versão da lógica (.py). O .xlam é versionado por NOME de arquivo (CalcCP_vN.xlam);
 # a lógica aqui é retrocompatível (só adiciona UDF, nunca remove/renomeia) — ver CHANGELOG.md.
-VERSION = "8.0.0"
+VERSION = "8.1.0"
 
 # Todas as UDFs têm o prefixo cp (ex.: =cpPu, =cpTaxa, =cpVna...).
 # Títulos com API (debênture, CRI/CRA, NTN-B…): via BTG → FI Analytics → B3 → bondbuilder.
@@ -641,6 +673,24 @@ def cpIncentivada(ticker):
         return _erro("incentivada", e)
 
 
+@xw.func
+def cpBreakeven(ticker):
+    """Taxa de break-even do papel segundo o BTG OTC Markets (campo break_even_rate do cadastro), em
+    DECIMAL como as outras taxas (6,4999% → 0,064999; DI+0,6188% → 0,006188).
+    ⚠️ O BTG não documenta o que é essa taxa. Só ~920 debêntures (DI+ e IPCA+) têm; em ~40% delas é a
+    própria taxa de emissão. #N/A se o papel não tiver o campo."""
+    if _IMPORT_ERROR:
+        return f"ERRO import: {_IMPORT_ERROR}"
+    try:
+        cad, erro = _cadastro_btg(ticker)
+        if erro:
+            return erro
+        be = cad.get("break_even_rate")
+        return _NA if _vazio_btg(be) else _taxa_decimal(be)
+    except Exception as e:
+        return _erro("breakeven", e)
+
+
 def _parece_titulo_publico(tk):
     """NTN-B/NTN-F/LTN/LFT (nome ou código CETIP) — usa a mesma regra do apis."""
     import apis
@@ -903,3 +953,28 @@ def cpDiaUtilMaisN(data, n):
         return d
     except Exception as e:
         return _erro("dumaisn", e)
+
+
+# =============================================================================
+# GUARDA DE TICKER — célula vazia ou com erro (#N/A, #REF!) não vai à rede
+# -----------------------------------------------------------------------------
+# Sem isto o ticker chegava como None, virava o texto "NONE" e a fórmula consultava
+# BTG, FI, B3 e bondbuilder (~1 a 4 s) só para devolver erro — em toda coluna de
+# planilha com #N/A. Vale para toda UDF cujo 1º argumento se chama `ticker`.
+# =============================================================================
+
+def _GuardaTicker(f):
+    @functools.wraps(f)
+    def w(*args, **kwargs):
+        tk = args[0] if args else kwargs.get("ticker")
+        if tk is None or (isinstance(tk, str) and not tk.strip()) or isinstance(tk, int) and tk < -2146820000:
+            return "ERRO: ticker vazio (ou célula com erro)"
+        return f(*args, **kwargs)
+    return w
+
+
+for _nomeUdf, _udf in list(globals().items()):
+    _info = getattr(_udf, "__xlfunc__", None)
+    if _nomeUdf.startswith("cp") and _info and _info["args"] and _info["args"][0]["name"] == "ticker":
+        globals()[_nomeUdf] = _GuardaTicker(_udf)
+

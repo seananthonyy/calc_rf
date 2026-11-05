@@ -338,9 +338,9 @@ def DadoSemTaxa(ticker, dataIso, campo):
     return None
 
 
-def _Abrir(req, base=None):
+def _Abrir(req, base=None, timeout=None):
     """Abre a requisição (timeout padrão). `base` mantido só p/ compat. da chamada."""
-    return _opener.open(req, timeout=TIMEOUT_SEG)
+    return _opener.open(req, timeout=timeout or TIMEOUT_SEG)
 
 
 def LimparCache():
@@ -355,6 +355,8 @@ def LimparCache():
     _discoSujo = False
     _tokenB3 = None
     _tokenBtg = None
+    global _cadBtgTudo, _cadBtgPedidos
+    _cadBtgTudo, _cadBtgPedidos = None, 0
     try:
         os.remove(_CACHE_FILE)
     except OSError:
@@ -423,8 +425,9 @@ def _ObterTokenBtg():
     return _tokenBtg[0] if _tokenBtg else None
 
 
-def _GetBtg(caminho, params):
-    """GET autenticado no BTG. Em 401 renova o token e tenta mais uma vez. dict ou None."""
+def _GetBtg(caminho, params, bruto=False, timeout=None):
+    """GET autenticado no BTG. Em 401 renova o token e tenta mais uma vez. dict ou None.
+    `bruto=True` devolve a resposta como veio (lista inteira), sem pegar só o 1º item."""
     global _tokenBtg
     url = f"{BTG_BASE}/{caminho}?" + "&".join(f"{k}={v}" for k, v in params.items())
     for tentativa in range(2):
@@ -433,8 +436,10 @@ def _GetBtg(caminho, params):
             return None
         try:
             req = urllib.request.Request(url, headers={"Authorization": f"Bearer {token}"}, method="GET")
-            with _Abrir(req, BTG_BASE) as resp:
+            with _Abrir(req, BTG_BASE, timeout=timeout) as resp:
                 dados = json.loads(_TextoBtg(resp.read()))
+            if bruto:
+                return dados
             return dados[0] if isinstance(dados, list) and dados else dados   # a doc diz lista; vem objeto
         except urllib.error.HTTPError as erro:
             if erro.code == 401 and tentativa == 0:
@@ -513,6 +518,27 @@ def TaxaBtg(ticker, dataIso, pu):
 _VAZIOS_BTG = {None, "", "-", "--", "nan", "None"}
 
 
+# Cadastro do BTG: papel a papel (0,2 s cada) até o 5º papel diferente da sessão; daí baixa o cadastro
+# INTEIRO de uma vez (~1,4 s, ~5.700 papéis) e responde os próximos da memória. Planilha com poucos
+# papéis não paga o download; planilha com centenas paga uma vez só em vez de centenas de idas à rede.
+_BTG_CAD_LIMIAR = 5
+_BTG_CAD_TIMEOUT = 30
+_cadBtgTudo = None          # (dict símbolo → linha, obtido_em) ou None
+_cadBtgPedidos = 0
+
+
+def _CadastroBtgInteiro():
+    """Mapa símbolo → linha do cadastro inteiro do BTG (validade CACHE_TTL_SEG), ou None se falhar."""
+    global _cadBtgTudo
+    if _cadBtgTudo and time.time() - _cadBtgTudo[1] < CACHE_TTL_SEG:
+        return _cadBtgTudo[0]
+    dados = _GetBtg("mktdata/instrument/all", {"pagination": "False"}, bruto=True, timeout=_BTG_CAD_TIMEOUT)
+    if not isinstance(dados, list) or not dados:
+        return None
+    _cadBtgTudo = ({str(x.get("symbol", "")).upper(): x for x in dados if isinstance(x, dict)}, time.time())
+    return _cadBtgTudo[0]
+
+
 def CadastroBtg(ticker):
     """Linha do cadastro do BTG (/mktdata/instrument/all?symbols=) do papel.
 
@@ -526,11 +552,18 @@ def CadastroBtg(ticker):
     c = _CacheGet(chave)
     if c is not _CACHE_AUSENTE:
         return c
+    global _cadBtgPedidos
     _Falhou(None)
-    dados = _GetBtg("mktdata/instrument/all", {"pagination": "False", "symbols": tk})
-    if dados is None:
-        return None                         # falha de rede/auth: não cacheia, tenta de novo depois
-    res = dados if isinstance(dados, dict) and str(dados.get("symbol", "")).upper() == tk else {}
+    _cadBtgPedidos += 1
+    mapa = _CadastroBtgInteiro() if _cadBtgPedidos >= _BTG_CAD_LIMIAR or _cadBtgTudo else None
+    if mapa is not None:
+        res = mapa.get(tk, {})
+    else:
+        _Falhou(None)
+        dados = _GetBtg("mktdata/instrument/all", {"pagination": "False", "symbols": tk})
+        if dados is None:
+            return None                     # falha de rede/auth: não cacheia, tenta de novo depois
+        res = dados if isinstance(dados, dict) and str(dados.get("symbol", "")).upper() == tk else {}
     _CacheSet(chave, res)
     return res
 
