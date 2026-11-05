@@ -4,6 +4,11 @@ Versionamento: a **lógica** (`.py`) é retrocompatível; o **`.xlam` é version
 (`CalcCP_vN.xlam`) — versões antigas ficam na share e não quebram quem já usa.
 `VERSION` no `CalcCP.py` acompanha a lógica.
 
+## v7.1.2 — 2026-11-05 — título público vai direto para a B3 (só lógica; **sem re-bake**)
+
+- NTN-B/NTN-F/LTN/LFT também pulam a FI (`/deb` e `/cr` só têm crédito privado e levavam ~7 s para recusar).
+  A 1ª consulta de NTNB35 caiu de ~7 s para ~3 s (quase tudo é o login da B3); as seguintes são instantâneas.
+
 ## v7.1.1 — 2026-11-05 — título público não passa mais pelo BTG (só lógica; **sem re-bake**)
 
 - O BTG OTC só tem crédito privado (debênture, CRI, CRA). NTN-B/NTN-F (nome amigável ou código CETIP) e

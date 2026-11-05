@@ -453,7 +453,7 @@ _RE_CETIP_TP = re.compile(r"^(760199|950199|100000|210100)\d{8}$")   # NTN-B, NT
 
 def _EhTituloPublico(tk):
     """Título público (NTN-B/NTN-F pelo nome amigável ou código CETIP de NTN-B/F, LTN, LFT).
-    O BTG OTC só tem crédito privado (debênture/CRI/CRA) → esses pulam o BTG sem ir à rede."""
+    BTG OTC e FI /deb e /cr só têm crédito privado → esses pulam os dois sem ir à rede (vão p/ a B3)."""
     t = str(tk).upper().strip()
     return _NormalizarTicker(t) != t or bool(_RE_CETIP_TP.match(t))
 
@@ -710,7 +710,11 @@ def _PostFi(corpo, path=FI_DEB_PATH):
 
 def _PostFiAuto(corpo):
     """Tenta debênture; se não for (ex.: CRI/CRA), tenta o endpoint de CRI/CRA.
-    Os dois endpoints devolvem os mesmos campos (m2m, m2mRate, ...)."""
+    Os dois endpoints devolvem os mesmos campos (m2m, m2mRate, ...).
+    Título público pula a FI sem ir à rede: /deb e /cr não têm, e a recusa leva ~7 s."""
+    if _EhTituloPublico(corpo.get("ticker", "")):
+        _Falhou("título público (FI /deb e /cr só têm crédito privado)")
+        return None
     motivos = []
     for path in (FI_DEB_PATH, FI_CR_PATH):
         _Falhou(None)
