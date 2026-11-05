@@ -72,6 +72,7 @@ usuário** (nenhuma precisa de admin/sistema):
 | Variável | Conteúdo |
 |---|---|
 | `CALCCP_DIR` | **pasta onde estão os arquivos do add-in** neste PC (ex.: `Z:\CP`). Se não setar, o `.xlam` cai no fallback `Z:\CP`. |
+| `token_btg_otc` | API key do **BTG OTC Markets** (1ª fonte de preço/taxa). Sem ela o add-in segue para a FI |
 | `token_calc_b3` | token do B3 Calculator |
 | `token_fianalytics_debentures` | API key FI Analytics — **Debêntures** |
 | `token_fianalytics_cri_cra` | API key FI Analytics — **CRIs/CRAs** |
@@ -139,7 +140,7 @@ ou a mensagem de que não foi encontrado (aí só as fórmulas `=cpAnbima…` fi
 - [ ] Pasta com os arquivos (ex.: `Z:\CP`) atualizada
 - [ ] `CALCCP_DIR` setada apontando pra essa pasta (ou usar o fallback `Z:\CP`)
 - [ ] Python 64-bit com xlwings **0.36.6** + DLL na raiz
-- [ ] `token_calc_b3`, `token_fianalytics_debentures`, `token_fianalytics_cri_cra`, `token_fianalytics_bond_builder`, `proxy_http`, `proxy_https` setados
+- [ ] `token_btg_otc`, `token_calc_b3`, `token_fianalytics_debentures`, `token_fianalytics_cri_cra`, `token_fianalytics_bond_builder`, `proxy_http`, `proxy_https` setados
 - [ ] "Confiar no acesso ao modelo de objeto de projeto do VBA" ligado
 - [ ] `.xlam` habilitado (aba **CalcCP** aparece)
 - [ ] (se multi-Python) `myaddin.conf` com a chave `Interpreter`
@@ -157,10 +158,10 @@ ou a mensagem de que não foi encontrado (aí só as fórmulas `=cpAnbima…` fi
 | `=cpTaxa(ticker; data; pu)` | Taxa de negociação (decimal → formate como %) |
 | `=cpDur(ticker; data; taxa%)` | Duration de Macaulay em anos |
 | `=cpCdi(dataIni; dataFim; percentual)` | Fator de CDI acumulado (percentual = número puro, 100 = 100%) |
-| `=cpFonteCalculo(ticker; [data]; [taxa%])` | **De onde vem o cálculo** do papel: `B3`, `FI Analytics`, `FI Analytics (bondbuilder)` ou `DI (local)` |
+| `=cpFonteCalculo(ticker; [data]; [taxa%])` | **De onde vem o cálculo** do papel: `BTG`, `FI Analytics`, `B3`, `FI Analytics (bondbuilder)` ou `DI (local)` |
 
-> **`=cpFonteCalculo` é auditoria da cascata**, não uma fonte a mais: responde quem, entre B3 → FI →
-> bondbuilder, de fato precifica aquele ticker — a mesma ordem que `=cpPu`/`=cpTaxa`/`=cpDur` usam.
+> **`=cpFonteCalculo` é auditoria da cascata**, não uma fonte a mais: responde quem, entre BTG → FI →
+> B3 → bondbuilder, de fato precifica aquele ticker — a mesma ordem que `=cpPu`/`=cpTaxa`/`=cpDur` usam.
 > Se alguma dessas fórmulas já rodou para o papel na sessão, a resposta sai **do cache, sem rede**;
 > senão ela sonda as fontes uma vez (e o resultado fica em cache para as demais fórmulas).
 > `data` e `taxa` são **opcionais** — servem só para a sondagem, e quem responde não depende delas:
@@ -170,11 +171,11 @@ ou a mensagem de que não foi encontrado (aí só as fórmulas `=cpAnbima…` fi
 ### Dados do papel (taxa OPCIONAL em PU Par/VNA/Fluxo — usa a de emissão se omitida)
 | Função | Retorno |
 |---|---|
-| `=cpPupar(ticker; data)` | PU Par (valor nominal atualizado + juros), B3 → FI Analytics → bondbuilder. **Sem taxa** desde o v5 (o PU Par não depende dela) |
-| `=cpVna(ticker; data; [taxa%])` | VNA — Valor Nominal Atualizado |
+| `=cpPupar(ticker; data)` | PU Par (valor nominal atualizado + juros), BTG → FI Analytics → B3 → bondbuilder. **Sem taxa** desde o v5 (o PU Par não depende dela) |
+| `=cpVna(ticker; data; [taxa%])` | VNA — Valor Nominal Atualizado. FI Analytics → B3 (o BTG não informa VNA) |
 | `=cpFluxo(ticker; data; [taxa%])` | Agenda **RESTANTE** a partir da data (spill): Data · Tipo · %Amort · %Incorp |
 | `=cpFluxoCompleto(ticker)` | Agenda **INTEIRA**, desde a emissão (spill): Data · %Amort · %Incorp |
-| `=cpValorFuturo(ticker; dataInicio; dataFim)` | Soma do **valor futuro** dos pagamentos (juros + amortização) com data de pagamento entre as duas datas, **inclusive**. B3 → FI Analytics. Calcula **sempre na data de hoje** (dia útil anterior, para o pagamento de hoje entrar): só conta pagamento **de hoje em diante**. Incorporação não conta (só o que é pago). `0` = nenhum pagamento no intervalo |
+| `=cpValorFuturo(ticker; dataInicio; dataFim)` | Soma do **valor futuro** dos pagamentos (juros + amortização) com data de pagamento entre as duas datas, **inclusive**. FI Analytics → B3 (o BTG não informa fluxo). Calcula **sempre na data de hoje** (dia útil anterior, para o pagamento de hoje entrar): só conta pagamento **de hoje em diante**. Incorporação não conta (só o que é pago). `0` = nenhum pagamento no intervalo |
 | `=cpVencimento(ticker)` | Data de vencimento |
 | `=cpEmissao(ticker)` | Data de emissão |
 | `=cpInicioRentabilidade(ticker)` | Data de início de rentabilidade |

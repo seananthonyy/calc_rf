@@ -1,9 +1,9 @@
 # =============================================================================
-# apis.py — cliente leve para B3 Calculator e FI Analytics
+# apis.py — cliente leve para BTG OTC Markets, FI Analytics e B3 Calculator
 # -----------------------------------------------------------------------------
 # Self-contained: usa apenas a biblioteca padrão (urllib), sem httpx e sem
 # depender de outros repositórios. Pensado para o add-in do Excel: precifica
-# via API (B3 → FI Analytics).
+# via API (BTG → FI Analytics → B3 → bondbuilder).
 #
 # Segredos e proxy: lidos de variáveis de ambiente (banco), com fallback no
 # .env para desenvolvimento local. Ver ENV_* abaixo.
@@ -33,6 +33,7 @@ from config import ENV_PATH
 # Nomes das variáveis de ambiente (definidas no banco). O add-in lê os segredos
 # daqui em produção; o .env serve só como fallback de desenvolvimento local.
 ENV_TOKEN_B3 = "token_calc_b3"
+ENV_KEY_BTG  = "token_btg_otc"   # API key do BTG OTC Markets (troca por um JWT de 30 min)
 # FI Analytics: uma chave POR PRODUTO, lida SÓ da variável de ambiente do produto (sem .env e
 # sem fallback para outra chave). Nomes iguais aos do banco.
 ENV_KEY_FI_DEB = "token_fianalytics_debentures"       # Debêntures      (/deb)
@@ -47,6 +48,9 @@ ENV_PROXY_HTTP  = "proxy_http"
 ENV_PROXY_HTTPS = "proxy_https"
 
 B3_BASE      = "https://api.calculadorarendafixa.com.br"
+BTG_BASE     = "https://otcmarkets-api.btgpactualsolutions.com/api/v1/btg-otc-mkts"
+BTG_CLIENT   = "calccp-addin"
+BTG_TOKEN_SEG = 25 * 60   # o JWT do BTG vale 30 min; renova antes
 FI_BASE      = "https://endpoint.fi-analytics.com.br"
 FI_DEB_PATH  = "/deb/debenturecalculator"
 FI_CR_PATH   = "/cr/cricracalculator"   # CRI/CRA (mesmos campos da resposta)
@@ -59,9 +63,14 @@ CACHE_TTL_SEG = 600  # 10 min
 # Preço/taxa de data PASSADA não muda; o cadastro (getBondDetails) e o memo de fonte quase nunca.
 # Esses ficam 12 h no disco, para reabrir o Excel sem refazer as chamadas.
 CACHE_TTL_LONGO_SEG = 12 * 3600
-_CHAVES_PRECO = {"b3pu": "b3", "fipu": "fi", "bbpu": "bb"}   # resultado de preço → fonte
-_CHAVES_DATADAS = set(_CHAVES_PRECO) | {"b3yield", "fiyield", "bbyield", "b3full", "fifull"}
-_CHAVES_ESTATICAS = {"b3bond", "fonte"}
+_CHAVES_PRECO = {"btgpu": "btg", "b3pu": "b3", "fipu": "fi", "bbpu": "bb"}   # resultado de preço → fonte
+_CHAVES_DATADAS = set(_CHAVES_PRECO) | {"btgyield", "b3yield", "fiyield", "bbyield", "b3full", "fifull"}
+# Memo de fonte no disco. "fonte2" desde a v7.1.0 (ordem nova BTG → FI → B3): os memos antigos
+# ("fonte", gravados com a B3 em 1º) são ignorados, senão furariam a ordem nova por até 12 h.
+_CHAVE_MEMO = "fonte2"
+_CHAVES_ESTATICAS = {"b3bond", _CHAVE_MEMO}
+# Ordem das fontes de preço/taxa (o memo do ticker só reordena; o fallback é sempre mantido).
+_ORDEM_FONTES = ["btg", "fi", "b3", "bb"]
 _CACHE_FILE = os.path.join(tempfile.gettempdir(), "calcrf_cache.json")
 
 # Gravação do cache em disco é "debounced": num recálculo em massa (F9), cada
@@ -123,8 +132,9 @@ _opener = _ConstruirOpener()
 
 
 _tokenB3 = None
+_tokenBtg = None      # (jwt, obtido_em)
 _cacheRespostas: dict = {}
-_fonteTicker: dict = {}   # ticker(upper) -> "b3"|"fi"|"bb": qual fonte respondeu (memo)
+_fonteTicker: dict = {}   # ticker(upper) -> "btg"|"fi"|"b3"|"bb": qual fonte respondeu (memo)
 
 # Diagnóstico: motivo real da última falha de cada fonte, por ticker, para as UDFs mostrarem
 # no lugar do genérico "APIs sem resposta". As funções de rede gravam em _ultimoErro; a
@@ -137,7 +147,7 @@ _cacheBruto: dict = {}
 # (ticker, dataIso) -> {fonte: {"pupar", "vna"}}: PU Par e VNA não dependem da taxa, então
 # qualquer preço já calculado do papel na data responde =cpPupar/=cpVna sem nova chamada.
 _porData: dict = {}   # ticker(upper) -> {"B3": msg, "FI": msg, "bondbuilder": msg}
-_ROTULO_DIAG = {"b3": "B3", "fi": "FI", "bb": "bondbuilder"}
+_ROTULO_DIAG = {"btg": "BTG", "fi": "FI", "b3": "B3", "bb": "bondbuilder"}
 
 
 def _Resumo(txt, n=160):
@@ -185,9 +195,9 @@ def _RegistrarFalha(tk, src):
 
 
 def ErroDetalhado(ticker):
-    """'B3: ... | FI: ... | bondbuilder: ...' com o motivo de cada fonte que falhou, ou ''."""
+    """'BTG: ... | FI: ... | B3: ... | bondbuilder: ...' com o motivo de cada fonte que falhou, ou ''."""
     erros = _errosTicker.get(str(ticker).upper().strip()) or {}
-    return " | ".join(f"{k}: {erros[k]}" for k in ("B3", "FI", "bondbuilder") if k in erros)
+    return " | ".join(f"{k}: {erros[k]}" for k in ("BTG", "FI", "B3", "bondbuilder") if k in erros)
 
 # Espelho em memória do cache de disco: chaveStr -> {"k":list, "v":valor, "t":ts}.
 # Carregado 1× no import; sincronizado com o arquivo só nos flushes (não a cada set).
@@ -215,7 +225,7 @@ def _CarregarCacheDisco():
         try:
             chave = tuple(entrada["k"])
             if isinstance(entrada, dict) and agora - entrada["t"] < _Ttl(chave):
-                if chave[0] == "fonte":
+                if chave[0] == _CHAVE_MEMO:
                     _fonteTicker[chave[1]] = entrada["v"]
                 else:
                     _cacheRespostas[chave] = entrada["v"]
@@ -311,7 +321,7 @@ def _Memo(tk, src):
     que ao reabrir o Excel um papel só-FI não teste a B3 (nem faça o login dela) de novo."""
     if _fonteTicker.get(tk) != src:
         _fonteTicker[tk] = src
-        _Persistir(("fonte", tk), src)
+        _Persistir((_CHAVE_MEMO, tk), src)
 
 
 def DadoSemTaxa(ticker, dataIso, campo):
@@ -321,7 +331,7 @@ def DadoSemTaxa(ticker, dataIso, campo):
     for t in dict.fromkeys((tk, _NormalizarTicker(tk))):
         porFonte = _porData.get((t, dataIso))
         if porFonte:
-            for src in _OrdemFontes(tk, ["b3", "fi", "bb"]):
+            for src in _OrdemFontes(tk, _ORDEM_FONTES):
                 v = (porFonte.get(src) or {}).get(campo)
                 if v is not None:
                     return v
@@ -335,7 +345,7 @@ def _Abrir(req, base=None):
 
 def LimparCache():
     """Esvazia o cache (memória+disco), o token e o memo."""
-    global _tokenB3, _discoSujo
+    global _tokenB3, _tokenBtg, _discoSujo
     _cacheRespostas.clear()
     _fonteTicker.clear()
     _errosTicker.clear()
@@ -344,11 +354,145 @@ def LimparCache():
     _discoRegistro.clear()
     _discoSujo = False
     _tokenB3 = None
+    _tokenBtg = None
     try:
         os.remove(_CACHE_FILE)
     except OSError:
         pass
 
+
+
+# -----------------------------------------------------------------------------
+# BTG OTC Markets (1ª fonte)
+# -----------------------------------------------------------------------------
+# POST /authenticate {api_key, client_id} → AccessToken (JWT, 30 min) → header
+# "Authorization: Bearer". GET /pricing/pu?ticker&rate&date → {pu, duration, pu_par}
+# e GET /pricing/rate?ticker&pu&date → {rate}. Taxa em % a.a. na unidade nativa (igual à
+# B3). Conferido 05/11/2026: 100 papéis (DEB/CRI/CRA; IPCA+, DI+, %DI, PRÉ) em D0 e D+1 →
+# PU, taxa, duration e PU Par IDÊNTICOS aos da B3. NÃO devolve VNA nem fluxo. Título
+# público não existe no BTG (404 → segue para a próxima fonte).
+
+def _TextoBtg(raw):
+    """O BTG manda as mensagens de erro em latin-1 (acentos), não em UTF-8."""
+    try:
+        return raw.decode("utf-8")
+    except UnicodeDecodeError:
+        return raw.decode("latin-1")
+
+
+def _MsgBtg(e):
+    """'HTTP 404 Ticker not found.' a partir do ApiClientError do BTG, senão o texto da exceção."""
+    if isinstance(e, urllib.error.HTTPError):
+        try:
+            corpo = json.loads(_TextoBtg(e.read()))
+            msg = corpo.get("ApiClientError") if isinstance(corpo, dict) else None
+        except Exception:
+            msg = None
+        return f"HTTP {e.code} {(msg or e.reason or '')[:160]}".strip()
+    return _MsgExcecao(e)
+
+
+def _LoginBtg():
+    """JWT do BTG a partir da API key, ou None."""
+    chave = os.getenv(ENV_KEY_BTG)
+    if not chave:
+        _Falhou(f"variável {ENV_KEY_BTG} não setada")
+        return None
+    try:
+        req = urllib.request.Request(
+            f"{BTG_BASE}/authenticate",
+            data=json.dumps({"api_key": chave, "client_id": BTG_CLIENT}).encode(),
+            headers={"Content-Type": "application/json"}, method="POST",
+        )
+        with _Abrir(req, BTG_BASE) as resp:
+            dados = json.loads(_TextoBtg(resp.read()))
+        token = dados.get("AccessToken") if isinstance(dados, dict) else None
+        if not token:
+            _Falhou(f"login BTG sem token: {_Resumo(json.dumps(dados))}")
+        return token
+    except Exception as e:
+        _Falhou(f"login BTG: {_MsgBtg(e)}")
+        return None
+
+
+def _ObterTokenBtg():
+    global _tokenBtg
+    if _tokenBtg is None or time.time() - _tokenBtg[1] > BTG_TOKEN_SEG:
+        token = _LoginBtg()
+        _tokenBtg = (token, time.time()) if token else None
+    return _tokenBtg[0] if _tokenBtg else None
+
+
+def _GetBtg(caminho, params):
+    """GET autenticado no BTG. Em 401 renova o token e tenta mais uma vez. dict ou None."""
+    global _tokenBtg
+    url = f"{BTG_BASE}/{caminho}?" + "&".join(f"{k}={v}" for k, v in params.items())
+    for tentativa in range(2):
+        token = _ObterTokenBtg()
+        if token is None:
+            return None
+        try:
+            req = urllib.request.Request(url, headers={"Authorization": f"Bearer {token}"}, method="GET")
+            with _Abrir(req, BTG_BASE) as resp:
+                dados = json.loads(_TextoBtg(resp.read()))
+            return dados[0] if isinstance(dados, list) and dados else dados   # a doc diz lista; vem objeto
+        except urllib.error.HTTPError as erro:
+            if erro.code == 401 and tentativa == 0:
+                _tokenBtg = None
+                continue
+            _Falhou(_MsgBtg(erro))
+            return None
+        except Exception as e:
+            _Falhou(_MsgBtg(e))
+            return None
+    return None
+
+
+def PrecoBtg(ticker, dataIso, taxa):
+    """/pricing/pu → {'pu', 'duration', 'pupar', 'vna': None} ou None. taxa em % a.a."""
+    tk = str(ticker).upper().strip()
+    taxa = _Norm(taxa)
+    chaveCache = ("btgpu", tk, dataIso, taxa)
+    cacheado = _CacheGet(chaveCache)
+    if cacheado is not _CACHE_AUSENTE:
+        return cacheado
+
+    dados = _GetBtg("pricing/pu", {"ticker": tk, "rate": taxa, "date": dataIso})
+    resultado = None
+    if isinstance(dados, dict):
+        pu, dur, pupar = dados.get("pu"), dados.get("duration"), dados.get("pu_par")
+        if pu is not None and float(pu) > 0:
+            resultado = {
+                "pu": float(pu),
+                "duration": float(dur) if dur is not None else None,
+                "pupar": float(pupar) if pupar is not None else None,
+                "vna": None,   # o BTG não devolve VNA → =cpVna cai na FI/B3 (ver Vna())
+            }
+        else:
+            _Falhou(f"resposta sem pu: {_Resumo(json.dumps(dados))}")
+    _CacheSet(chaveCache, resultado)
+    return resultado
+
+
+def TaxaBtg(ticker, dataIso, pu):
+    """/pricing/rate → taxa em % a.a. ou None."""
+    tk = str(ticker).upper().strip()
+    pu = _Norm(pu)
+    chaveCache = ("btgyield", tk, dataIso, pu)
+    cacheado = _CacheGet(chaveCache)
+    if cacheado is not _CACHE_AUSENTE:
+        return cacheado
+
+    dados = _GetBtg("pricing/rate", {"ticker": tk, "pu": pu, "date": dataIso})
+    resultado = None
+    if isinstance(dados, dict):
+        taxa = dados.get("rate")
+        if taxa is not None and float(taxa) > 0:
+            resultado = float(taxa)
+        else:
+            _Falhou(f"resposta sem rate: {_Resumo(json.dumps(dados))}")
+    _CacheSet(chaveCache, resultado)
+    return resultado
 
 # -----------------------------------------------------------------------------
 # B3 Calculator
@@ -743,7 +887,7 @@ def TaxaBb(ticker, dataIso, pu):
     return resultado
 
 
-# ─── roteamento B3 → FI → bondbuilder com memo de fonte por ticker ───────────
+# ─── roteamento BTG → FI → B3 → bondbuilder com memo de fonte por ticker ─────
 # Tenta as fontes em ordem; a que respondeu (só em sucesso) é memorizada e passa
 # a ser tentada 1º nas próximas — mas o fallback é SEMPRE mantido (o memo só
 # reordena, nunca bloqueia). bondbuilder fica por último.
@@ -753,11 +897,14 @@ def _OrdemFontes(tk, todas):
     return [memo] + [s for s in todas if s != memo] if memo in todas else list(todas)
 
 
+_FONTES_PRECO = {"btg": PrecoBtg, "fi": PrecoFi, "b3": PrecoB3, "bb": PrecoBb}
+
+
 def Preco(ticker, dataIso, taxa):
-    """PU via B3→FI→bondbuilder com memo de fonte. dict {pu,duration,pupar} ou None."""
+    """PU via BTG→FI→B3→bondbuilder com memo de fonte. dict {pu,duration,pupar,vna} ou None."""
     tk = str(ticker).upper().strip()
-    fontes = {"b3": PrecoB3, "fi": PrecoFi, "bb": PrecoBb}
-    for src in _OrdemFontes(tk, ["b3", "fi", "bb"]):
+    fontes = _FONTES_PRECO
+    for src in _OrdemFontes(tk, _ORDEM_FONTES):
         _Falhou(None)
         r = fontes[src](tk, dataIso, taxa)
         if r:
@@ -767,32 +914,47 @@ def Preco(ticker, dataIso, taxa):
     return None
 
 
-def PuPar(ticker, dataIso, taxa):
-    """PU Par via B3→FI→bondbuilder (memo de fonte): a 1ª fonte que devolver o PU Par.
+def _CampoSemTaxa(ticker, dataIso, taxa, campo):
+    """`campo` ("pupar"/"vna") via BTG→FI→B3→bondbuilder: a 1ª fonte que devolver o campo.
 
-    Diferente do Preco(), que para na 1ª fonte com PU: aqui uma fonte que precifica mas
-    não traz o PU Par cede a vez à próxima. O PU Par não depende da taxa (VNA + juros do
-    contrato), então `taxa` só serve para montar a chamada. float ou None."""
+    Diferente do Preco(), que para na 1ª fonte com PU: aqui uma fonte que precifica mas não
+    traz o campo cede a vez à próxima (o BTG não traz VNA). O campo não depende da taxa, então
+    `taxa` só monta a chamada. O memo guarda a 1ª fonte que PRECIFICOU o papel, não a que trouxe
+    o campo — senão o =cpVna de um papel do BTG empurraria o =cpPu dele para a FI. float ou None."""
     tk = str(ticker).upper().strip()
-    conhecido = DadoSemTaxa(tk, dataIso, "pupar")
+    conhecido = DadoSemTaxa(tk, dataIso, campo)
     if conhecido is not None:
         return conhecido
-    fontes = {"b3": PrecoB3, "fi": PrecoFi, "bb": PrecoBb}
-    for src in _OrdemFontes(tk, ["b3", "fi", "bb"]):
+    precificou = False
+    for src in _OrdemFontes(tk, _ORDEM_FONTES):
         _Falhou(None)
-        r = fontes[src](tk, dataIso, taxa)
-        if r and r.get("pupar") is not None:
-            _Memo(tk, src)
-            return r["pupar"]
-        _RegistrarFalha(tk, src)
+        r = _FONTES_PRECO[src](tk, dataIso, taxa)
+        if r:
+            if not precificou:
+                _Memo(tk, src)
+                precificou = True
+            if r.get(campo) is not None:
+                return r[campo]
+        else:
+            _RegistrarFalha(tk, src)
     return None
 
 
+def PuPar(ticker, dataIso, taxa):
+    """PU Par via BTG→FI→B3→bondbuilder (a 1ª fonte que devolver o PU Par). float ou None."""
+    return _CampoSemTaxa(ticker, dataIso, taxa, "pupar")
+
+
+def Vna(ticker, dataIso, taxa):
+    """VNA via BTG→FI→B3→bondbuilder (o BTG não traz VNA e cede a vez). float ou None."""
+    return _CampoSemTaxa(ticker, dataIso, taxa, "vna")
+
+
 def TaxaOp(ticker, dataIso, pu):
-    """Taxa (% a.a.) via B3→FI→bondbuilder com memo de fonte. float ou None."""
+    """Taxa (% a.a.) via BTG→FI→B3→bondbuilder com memo de fonte. float ou None."""
     tk = str(ticker).upper().strip()
-    fontes = {"b3": TaxaB3, "fi": TaxaFi, "bb": TaxaBb}
-    for src in _OrdemFontes(tk, ["b3", "fi", "bb"]):
+    fontes = {"btg": TaxaBtg, "fi": TaxaFi, "b3": TaxaB3, "bb": TaxaBb}
+    for src in _OrdemFontes(tk, _ORDEM_FONTES):
         _Falhou(None)
         r = fontes[src](tk, dataIso, pu)
         if r is not None:
@@ -803,13 +965,13 @@ def TaxaOp(ticker, dataIso, pu):
 
 
 def FonteTicker(ticker):
-    """Fonte já conhecida do ticker ("b3"/"fi"/"bb"), ou None se ainda não sabemos.
+    """Fonte já conhecida do ticker ("btg"/"fi"/"b3"/"bb"), ou None se ainda não sabemos.
     Só lê o memo — nunca toca a rede, e por isso não precisa de data nem taxa."""
     return _fonteTicker.get(str(ticker).upper().strip())
 
 
 def FonteCalculo(ticker, dataIso, taxa):
-    """Qual fonte precifica este ticker: "b3", "fi", "bb" ou None (nenhuma responde).
+    """Qual fonte precifica este ticker: "btg", "fi", "b3", "bb" ou None (nenhuma responde).
 
     Se o memo já sabe (algum =cpPu/=cpTaxa/=cpDur já rodou para o papel nesta
     sessão), devolve na hora, sem rede. Senão roda a MESMA cascata do Preco() —
@@ -976,12 +1138,13 @@ def _FluxoB3(full):
 
 def FluxoFuturo(ticker, dataIso, taxa):
     """Eventos ESTRITAMENTE posteriores a `dataIso` com valor futuro: (fonte, [{data,tipo,prazo,vf,vp}])
-    ou None. Cascata B3 → FI (/deb, /cr, bondbuilder), na ordem do memo de fonte do ticker.
+    ou None. Cascata FI (/deb, /cr, bondbuilder) → B3, na ordem do memo de fonte do ticker
+    (o BTG não devolve fluxo).
 
     O valor futuro não depende da taxa (conferido em IPCA, DI e PRE) — `taxa` só monta a chamada.
     A FI recusa data futura; a B3 aceita. Papel DI: as duas projetam com curvas próprias e diferem."""
     tk = str(ticker).upper().strip()
-    for src in _OrdemFontes(tk, ["b3", "fi"]):
+    for src in _OrdemFontes(tk, ["fi", "b3"]):
         if src == "b3":
             full = _CalcPuB3Full(tk, dataIso, taxa)
             if isinstance(full, dict):

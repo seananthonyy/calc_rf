@@ -4,6 +4,22 @@
 
 Documentação técnica para o Claude Code. Leia antes de alterar qualquer coisa nesta pasta.
 
+> ## 🟢 ATUALIZAÇÃO 05/11/2026 — v7.1.0: BTG OTC Markets em 1º; ordem BTG → FI → B3 → bb (só `.py`)
+> - `apis._ORDEM_FONTES = ["btg", "fi", "b3", "bb"]` usado por `Preco`/`TaxaOp`/`PuPar`/`DadoSemTaxa`.
+>   `FluxoFuturo` = `["fi", "b3"]` (BTG não tem fluxo). Decisão do usuário.
+> - BTG: `POST {BTG_BASE}/authenticate {api_key, client_id}` → JWT 30 min (`_ObterTokenBtg` renova a 25 min
+>   ou em 401) → `GET /pricing/pu?ticker&rate&date` / `/pricing/rate?ticker&pu&date`. Resposta é OBJETO
+>   (a doc diz lista; `_GetBtg` aceita os dois). Erro em latin-1 (`_TextoBtg`), motivo em `ApiClientError`.
+>   Chave: env `token_btg_otc` (sem `.env`). 100 papéis × D0/D+1 idênticos à B3 (PU, taxa, duration, PU Par)
+>   ⇒ o BTG usa o motor da B3 ou equivalente.
+> - **BTG não devolve VNA** → `PuPar`/`Vna` viraram `_CampoSemTaxa(campo)`: fonte que precifica sem o campo
+>   cede a vez; o memo guarda a 1ª que PRECIFICOU (senão `cpVna` empurraria o `cpPu` do papel p/ a FI).
+>   `cpVna` usa `apis.Vna` (antes `Preco`).
+> - Memo no disco mudou de chave `"fonte"` → `"fonte2"` (`_CHAVE_MEMO`): os memos antigos punham a B3 em 1º.
+> - Testado: UDFs fora do Excel, sem `token_btg_otc` (pula direto p/ FI, 0 chamadas ao BTG) e update a
+>   quente (v7.0.5 carregado → arquivos trocados → `importlib.reload(CalcCP)`: sem erro, passa a BTG).
+> - Fora do banco funciona; **na rede do Itaú não testado** (proxy/firewall para o domínio do BTG).
+
 > ## 🟢 ATUALIZAÇÃO 04/11/2026 (3) — v7.0.5: menos chamadas (só `.py`)
 > - **`_cacheBruto` (só memória)** via `_Bruto(chave, buscar)`: `_CalcPuB3Bruto` (PrecoB3 + _CalcPuB3Full),
 >   `_FiBruto` (PrecoFi + _FiFull), `_BbFull` (PrecoBb + _FiFull fallback). Os caches "pequenos" (b3pu, fipu,
@@ -214,8 +230,8 @@ Documentação técnica para o Claude Code. Leia antes de alterar qualquer coisa
 
 Add-in de Excel que expõe 5 funções de planilha (UDFs) para precificar títulos de renda fixa.
 Depois de instalado, a aba do ribbon aparece como **CalcCP**.
-- **Títulos com API** (debênture, CRI/CRA, NTN-B/NTN-F): números vêm das APIs (B3 Calculator →
-  FI Analytics, nessa ordem). Sem leitura de base de dados local.
+- **Títulos com API** (debênture, CRI/CRA, NTN-B/NTN-F): números vêm das APIs (BTG OTC Markets →
+  FI Analytics → B3 Calculator → bondbuilder, nessa ordem — desde a v7.1.0). Sem leitura de base de dados local.
 - **DI (tickers `DI1...`)**: NÃO existe API → calculado **localmente** em `di.py` (contagem de dias
   úteis + `feriados_anbima.csv`). O `CalcCP.py` roteia: se `di.EhTickerDi(ticker)` → local,
   senão → APIs.
@@ -261,6 +277,7 @@ Depois de instalado, a aba do ribbon aparece como **CalcCP**.
 
 | Para | Variável de ambiente | Fallback `.env` (dev) |
 |---|---|---|
+| API key BTG OTC Markets | `token_btg_otc` | (sem fallback) |
 | Token B3 Calculator | `token_calc_b3` | `B3_CALC_TOKEN` |
 | API key FI — Debêntures (`/deb`) | `token_fianalytics_deb` | `FIANALYTICS_API_KEY_DEB` |
 | API key FI — CRIs/CRAs (`/cr`) | `token_fianalytics_cricra` | `FIANALYTICS_API_KEY_CRICRA` |

@@ -28,16 +28,16 @@ _EXCEL_EPOCH = date_type(1899, 12, 30)
 
 # Versão da lógica (.py). O .xlam é versionado por NOME de arquivo (CalcCP_vN.xlam);
 # a lógica aqui é retrocompatível (só adiciona UDF, nunca remove/renomeia) — ver CHANGELOG.md.
-VERSION = "7.0.5"
+VERSION = "7.1.0"
 
 # Todas as UDFs têm o prefixo cp (ex.: =cpPu, =cpTaxa, =cpVna...).
-# Títulos com API (debênture, CRI/CRA, NTN-B…): via B3 → FI Analytics → bondbuilder.
+# Títulos com API (debênture, CRI/CRA, NTN-B…): via BTG → FI Analytics → B3 → bondbuilder.
 # DI (tickers DI1...): sem API → calculado LOCALMENTE em di.py.
 # Séries macro (SELIC, CDI, IPCA, dólar…): API pública do Banco Central (SGS).
 _IMPORT_ERROR = None
 try:
     from apis import (
-        Preco, PuPar, TaxaOp, LimparCache, FatorDi, FonteCalculo, FonteTicker,
+        Preco, PuPar, Vna, TaxaOp, LimparCache, FatorDi, FonteCalculo, FonteTicker,
         CampoBond, CampoFi, FluxoCadastrado, FluxoFuturo, BcbValor, IpcaIndice,
         ErroDetalhado, DadoSemTaxa,
     )
@@ -113,9 +113,9 @@ def _erro(pref, e):
     return f"ERRO: {e}"
 
 
-def _sem_resposta(ticker, texto="APIs sem resposta (B3/FI)"):
+def _sem_resposta(ticker, texto="APIs sem resposta (BTG/FI/B3)"):
     """Mensagem de falha da cascata com o motivo real de cada fonte, quando conhecido
-    (ex.: 'ERRO: APIs sem resposta (B3/FI) — B3: HTTP 400 ... | FI: /deb HTTP 403 ...')."""
+    (ex.: 'ERRO: APIs sem resposta (BTG/FI/B3) — BTG: HTTP 404 ... | FI: /deb HTTP 403 ...')."""
     detalhe = ErroDetalhado(ticker)
     return f"ERRO: {texto} — {detalhe}" if detalhe else f"ERRO: {texto}"
 
@@ -153,7 +153,7 @@ def cpTeste():
 
 @xw.func
 def cpLimparCache():
-    """Esvazia o cache das APIs (B3/FI/BCB) e o das consultas ao trades.db."""
+    """Esvazia o cache das APIs (BTG/FI/B3/BCB) e o das consultas ao trades.db."""
     if _IMPORT_ERROR:
         return f"ERRO import: {_IMPORT_ERROR}"
     LimparCache()
@@ -188,13 +188,13 @@ def Sobre():
 
 
 # =============================================================================
-# PRECIFICAÇÃO — PU, Taxa, Duration (B3 → FI → bondbuilder; DI local)
+# PRECIFICAÇÃO — PU, Taxa, Duration (BTG → FI → B3 → bondbuilder; DI local)
 # =============================================================================
 
 @xw.func
 @xw.arg('taxa', numbers=float)
 def cpPu(ticker, data, taxa):
-    """PU de Operação. taxa como % do Excel (ex.: 6,4618%). Fonte: B3 → FI."""
+    """PU de Operação. taxa como % do Excel (ex.: 6,4618%). Fonte: BTG → FI → B3."""
     if _IMPORT_ERROR:
         return f"ERRO import: {_IMPORT_ERROR}"
     try:
@@ -209,17 +209,17 @@ def cpPu(ticker, data, taxa):
         return _erro("pu", e)
 
 
-_FONTE_ROTULO = {"b3": "B3", "fi": "FI Analytics", "bb": "FI Analytics (bondbuilder)"}
+_FONTE_ROTULO = {"btg": "BTG", "b3": "B3", "fi": "FI Analytics", "bb": "FI Analytics (bondbuilder)"}
 _TAXA_SONDA = 10.0   # taxa qualquer, só para sondar quem responde (ver cpFonteCalculo)
 
 
 @xw.func
 @xw.arg('taxa', numbers=float)
 def cpFonteCalculo(ticker, data=None, taxa=None):
-    """De ONDE vem o cálculo do papel: "B3", "FI Analytics",
+    """De ONDE vem o cálculo do papel: "BTG", "FI Analytics", "B3",
     "FI Analytics (bondbuilder)" ou "DI (local)".
 
-    É a mesma cascata que =cpPu/=cpTaxa/=cpDur usam (B3 → FI → bondbuilder), então
+    É a mesma cascata que =cpPu/=cpTaxa/=cpDur usam (BTG → FI → B3 → bondbuilder), então
     responde a fonte que de fato precificaria o papel. Se alguma dessas fórmulas já
     rodou para o ticker nesta sessão, sai do cache, sem rede.
     `data` e `taxa` são OPCIONAIS e servem só para sondar quem responde (quem responde
@@ -268,7 +268,7 @@ def cpTaxa(ticker, data, pu):
 @xw.func
 @xw.arg('taxa', numbers=float)
 def cpDur(ticker, data, taxa):
-    """Duration de Macaulay em ANOS. Fonte: B3 → FI."""
+    """Duration de Macaulay em ANOS. Fonte: BTG → FI → B3."""
     if _IMPORT_ERROR:
         return f"ERRO import: {_IMPORT_ERROR}"
     try:
@@ -305,8 +305,8 @@ def _IgnorarArgsExtras(f):
 @_IgnorarArgsExtras
 @xw.func
 def cpPupar(ticker, data):
-    """PU Par (valor nominal atualizado + juros acumulados) na data, via B3 → FI Analytics →
-    bondbuilder (a 1ª que devolver o PU Par). Não recebe taxa: o PU Par não depende dela."""
+    """PU Par (valor nominal atualizado + juros acumulados) na data, via BTG → FI Analytics →
+    B3 → bondbuilder (a 1ª que devolver o PU Par). Não recebe taxa: o PU Par não depende dela."""
     if _IMPORT_ERROR:
         return f"ERRO import: {_IMPORT_ERROR}"
     try:
@@ -321,7 +321,7 @@ def cpPupar(ticker, data):
         pupar = PuPar(ticker, _data_iso(data), float(taxaPct) if taxaPct is not None else _TAXA_SONDA)
         if pupar is not None:
             return float(pupar)
-        return _sem_resposta(ticker, "PU Par indisponível (B3/FI)")
+        return _sem_resposta(ticker, "PU Par indisponível (BTG/FI/B3)")
     except Exception as e:
         return _erro("pupar", e)
 
@@ -337,10 +337,11 @@ def cpVna(ticker, data, taxa=None):
         conhecido = DadoSemTaxa(ticker, _data_iso(data), "vna")
         if conhecido is not None:
             return float(conhecido)
-        r = Preco(ticker, _data_iso(data), _resolve_taxa(ticker, taxa))
-        if r and r.get("vna") is not None:
-            return float(r["vna"])
-        return "ERRO: VNA indisponível (B3/FI)"
+        # Cascata própria: o BTG (1ª fonte de preço) não devolve VNA → cede a vez à FI/B3.
+        vna = Vna(ticker, _data_iso(data), _resolve_taxa(ticker, taxa))
+        if vna is not None:
+            return float(vna)
+        return _sem_resposta(ticker, "VNA indisponível (FI/B3)")
     except Exception as e:
         return _erro("vna", e)
 
@@ -392,7 +393,7 @@ def cpValorFuturo(ticker, dataInicio, dataFim):
     de cada pagamento daí até o vencimento, e a fórmula soma os que caem no intervalo. Não é a
     própria data de hoje porque a API só lista eventos POSTERIORES à data de cálculo — o pagamento
     de hoje sumiria. Pagamentos já feitos (antes de hoje) não entram.
-    Taxa qualquer (_TAXA_SONDA): o VF não depende dela. Fonte: B3 → FI Analytics.
+    Taxa qualquer (_TAXA_SONDA): o VF não depende dela. Fonte: FI Analytics → B3 (o BTG não tem fluxo).
     0 = nenhum pagamento no intervalo."""
     if _IMPORT_ERROR:
         return f"ERRO import: {_IMPORT_ERROR}"
@@ -406,7 +407,7 @@ def cpValorFuturo(ticker, dataInicio, dataFim):
             base -= timedelta(days=1)
         r = FluxoFuturo(ticker, base.isoformat(), _TAXA_SONDA)
         if r is None:
-            return "ERRO: fluxo indisponível (B3/FI)"
+            return "ERRO: fluxo indisponível (FI/B3)"
         iniIso, fimIso = ini.isoformat(), fim.isoformat()
         soma = sum(e["vf"] for e in r[1]
                    if e["vf"] is not None and iniIso <= _ajusta_du_iso(e["data"]) <= fimIso)

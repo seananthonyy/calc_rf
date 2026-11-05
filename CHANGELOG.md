@@ -4,6 +4,20 @@ Versionamento: a **lógica** (`.py`) é retrocompatível; o **`.xlam` é version
 (`CalcCP_vN.xlam`) — versões antigas ficam na share e não quebram quem já usa.
 `VERSION` no `CalcCP.py` acompanha a lógica.
 
+## v7.1.0 — 2026-11-05 — BTG OTC Markets como 1ª fonte; ordem BTG → FI → B3 (só lógica; **sem re-bake**)
+
+- **Ordem nova das fontes** de `=cpPu`, `=cpTaxa`, `=cpDur` e `=cpPupar`: **BTG → FI Analytics → B3 →
+  bondbuilder** (antes B3 → FI → bondbuilder). A primeira que responder vale.
+- **BTG OTC Markets** (`otcmarkets-api.btgpactualsolutions.com`): `/pricing/pu` (taxa→PU, duration, PU Par)
+  e `/pricing/rate` (PU→taxa). Conferido em 05/11/2026 contra a B3 em 100 papéis (debêntures, CRI e CRA;
+  IPCA+, DI+, %DI, pré), em D0 e D+1: **PU, taxa, duration e PU Par idênticos** aos da B3.
+- **Variável nova `token_btg_otc`** (API key do BTG). Sem ela o add-in não chama o BTG e segue para a FI —
+  aí os números passam a sair da FI, que pode diferir da B3 na 6ª casa (CEAP12: 1129,312513 × 1129,312712).
+- O BTG **não tem VNA, fluxo nem título público**: `=cpVna` e `=cpValorFuturo` vão FI → B3; NTN-B/NTN-F
+  caem na B3 depois de BTG e FI recusarem (1ª vez mais lenta, depois o papel fica memorizado).
+- `=cpFonteCalculo` pode responder `BTG`. A mensagem de erro passa a listar `BTG: ... | FI: ... | B3: ...`.
+- A fonte memorizada de cada papel no disco foi zerada (as antigas mandavam tentar a B3 primeiro).
+
 ## v7.0.5 — 2026-11-04 — menos chamadas às APIs (só lógica; **sem re-bake**)
 
 Nenhum resultado muda; só caem as chamadas repetidas. Teste com 45 fórmulas (5 papéis × 9 fórmulas):
