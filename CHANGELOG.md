@@ -4,6 +4,19 @@ Versionamento: a **lógica** (`.py`) é retrocompatível; o **`.xlam` é version
 (`CalcCP_vN.xlam`) — versões antigas ficam na share e não quebram quem já usa.
 `VERSION` no `CalcCP.py` acompanha a lógica.
 
+## v7.2.0 — 2026-11-05 — sai a base local; `cpEmissor` e `cpAnbima*` passam a vir do BTG (só lógica; **sem re-bake**)
+
+- **Saiu tudo que lia a base local do projeto de negociação secundária** (`trades.db`, que deixou de
+  existir): o módulo `basedados.py`, a busca do arquivo no `config.py` (`ResolverTradesDb`), a variável
+  `TRADES_DB_PATH` e a linha do `trades.db` no `=cpTeste()` e no **Sobre**.
+- **`=cpAnbimaRef`, `=cpAnbimaIndicativo` e `=cpAnbimaSpread` agora vêm do cadastro do BTG**, que repete
+  o arquivo público da ANBIMA da **última divulgação** (indicativa idêntica em 1.183 debêntures, 05/11).
+  Ref: `NTN-B 30` (IPCA+) ou `FUNDING` (DI+/%DI); PRÉ dá `#N/A` (o BTG não traz a ref DI1). Spread IPCA+
+  = indicativa − taxa da NTN-B de referência da mesma divulgação. Sem data: não há histórico.
+- **`=cpAnbimaIndicativoHistorico` descontinuada:** continua registrada no `.xlam`, mas devolve erro.
+- **`=cpEmissor`: BTG primeiro, B3 depois.** Em CRI/CRA o BTG traz o **devedor** (UNIDAS, VIBRA, CASHME)
+  em vez da securitizadora. Debêntures podem vir com nome mais curto (ELET42: `ELETROBRAS`).
+
 ## v7.1.2 — 2026-11-05 — título público vai direto para a B3 (só lógica; **sem re-bake**)
 
 - NTN-B/NTN-F/LTN/LFT também pulam a FI (`/deb` e `/cr` só têm crédito privado e levavam ~7 s para recusar).

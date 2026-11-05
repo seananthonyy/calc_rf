@@ -3,8 +3,7 @@
 Add-in de planilha (UDFs) para precificar renda fixa e puxar indicadores. Todas as funções têm o
 prefixo **`cp`** (ex.: `=cpPu`). As fontes são as APIs **B3 Calculator**, **FI Analytics** e
 **Banco Central (SGS)/IBGE**; contratos de **DI futuro** (`DI1F27`…) são calculados **localmente**;
-as fórmulas **ANBIMA** (`=cpAnbima…`) leem a base do projeto de negociação secundária (`trades.db`),
-em **somente leitura**. Datas aceitam `"dd/mm/aaaa"`, célula de data ou `HOJE()`.
+as fórmulas **ANBIMA** (`=cpAnbima…`) vêm do cadastro do **BTG OTC Markets** (última divulgação). Datas aceitam `"dd/mm/aaaa"`, célula de data ou `HOJE()`.
 
 > **Documentação:** este `README.md` cobre uso, instalação e operação. Detalhes de arquitetura,
 > re-bake do `.xlam` e internals do xlwings estão no `CLAUDE.md` (referência de desenvolvimento).
@@ -41,13 +40,8 @@ em **somente leitura**. Datas aceitam `"dd/mm/aaaa"`, célula de data ou `HOJE()
    `.xlam` lê a pasta da variável de ambiente **`CALCCP_DIR`** (com fallback para `Z:\CP`,
    se a variável não estiver setada — ver [passo 2](#2-variáveis-de-ambiente-do-usuário-segredos--proxy--pasta)).
    Assim cada PC pode apontar para onde a pasta estiver (share com letra diferente, cópia local etc.).
-   Conteúdo mínimo da pasta: `CalcCP_v7.xlam`, `CalcCP.py`, `apis.py`, `di.py`, `basedados.py`,
+   Conteúdo mínimo da pasta: `CalcCP_v7.xlam`, `CalcCP.py`, `apis.py`, `di.py`,
    `config.py`, `feriados_anbima.csv`. Puxar do repositório do projeto (ou extrair o `CalcCP_bundle.py`).
-4. **(Só para as fórmulas ANBIMA) acesso de leitura ao `trades.db`** do projeto de negociação
-   secundária. O add-in **descobre o arquivo sozinho** procurando a árvore
-   `…\NegociacaoSecundario\code\data\trades.db` a partir da pasta do add-in e da pasta-mãe dela
-   (é o layout da share: a pasta do add-in e a do projeto são irmãs). Se estiver em outro lugar,
-   aponte a variável **`TRADES_DB_PATH`** para o arquivo. As demais fórmulas não dependem disso.
 
 ---
 
@@ -81,7 +75,6 @@ usuário** (nenhuma precisa de admin/sistema):
 | `user_fianalytics` | e-mail do usuário FI (só p/ o fallback bondbuilder; opcional) |
 | `proxy_http` | `http://USUARIO:SENHA@HOST:PORTA` |
 | `proxy_https` | `http://USUARIO:SENHA@HOST:PORTA` |
-| `TRADES_DB_PATH` | **opcional** — caminho completo do `trades.db` (só para as fórmulas `=cpAnbima…`). Sem ela, o add-in procura sozinho a pasta `…\NegociacaoSecundario\code\data\` a partir da pasta do add-in e da pasta-mãe. |
 
 `CALCCP_DIR` é o que resolve o path por PC. Setar (CMD, sem admin) e **reiniciar o Excel**:
 ```
@@ -127,14 +120,12 @@ Esse arquivo é **por PC e por usuário** (não vai pro repositório).
 ### 6. Testar
 Feche e reabra o Excel:
 ```
-=cpTeste()                              -> OK v7.0.5 — path: Z:\CP — CALCCP_DIR=Z:\CP — trades.db: OK (ANBIMA até 2026-07-17) — ...
+=cpTeste()                              -> OK v7.2.0 — path: Z:\CP — CALCCP_DIR=Z:\CP
 =cpPu("FGEN13"; "13/06/2025"; 6,4686%)  -> ~961,70
 =cpPu("DI1F27"; "01/07/2026"; 10%)      -> ~95310,20   (DI, cálculo local)
-=cpAnbimaRef("FGEN13")                  -> NTN-B 27    (leitura do trades.db)
-=cpAnbimaSpread("FGEN13")               -> -0,005193   (= -51,93 bps sobre a NTN-B 27)
+=cpAnbimaRef("CEAP12")                  -> NTN-B 30    (BTG, última divulgação ANBIMA)
+=cpAnbimaSpread("CEAP12")               -> 0,002965    (= 29,65 bps sobre a NTN-B 30, em 05/11/2026)
 ```
-O `=cpTeste()` termina com o estado do `trades.db`: `OK (ANBIMA até <data>)` mais o caminho em uso,
-ou a mensagem de que não foi encontrado (aí só as fórmulas `=cpAnbima…` ficam indisponíveis).
 
 ### Checklist (por PC)
 - [ ] Pasta com os arquivos (ex.: `Z:\CP`) atualizada
@@ -145,7 +136,6 @@ ou a mensagem de que não foi encontrado (aí só as fórmulas `=cpAnbima…` fi
 - [ ] `.xlam` habilitado (aba **CalcCP** aparece)
 - [ ] (se multi-Python) `myaddin.conf` com a chave `Interpreter`
 - [ ] `=cpPu("FGEN13";"13/06/2025";6,4686%)` ≈ 961,70
-- [ ] (fórmulas ANBIMA) `=cpTeste()` diz `trades.db: OK` — senão, setar `TRADES_DB_PATH`
 
 ---
 
@@ -182,7 +172,7 @@ ou a mensagem de que não foi encontrado (aí só as fórmulas `=cpAnbima…` fi
 | `=cpTaxaEmissao(ticker)` | Taxa de emissão em **decimal** (6,4618% → 0,064618; %DI → 1,135) |
 | `=cpVne(ticker)` | Valor Nominal de Emissão |
 | `=cpAniversario(ticker)` | Dia de aniversário |
-| `=cpEmissor(ticker)` | Nome do emissor (B3; em CRI/CRA vem a **securitizadora**). Papel sem cadastro na B3 (título público, alguns CRA) → `ERRO: emissor indisponível` |
+| `=cpEmissor(ticker)` | Nome do emissor — o **risco**. BTG primeiro (em CRI/CRA vem o **devedor**, ex.: `UNIDAS`); sem BTG, B3 (que em CRI/CRA devolve a securitizadora). Sem nenhum → `ERRO: emissor indisponível (BTG/B3)` |
 
 > `cpFluxo` × `cpFluxoCompleto`: as duas vêm da **agenda cadastrada** na B3 (`getBondDetails`) e trazem
 > uma linha por data de evento — a data de amortização, que a B3 manda em 2 eventos (o `A` e o `J`),
@@ -198,40 +188,26 @@ ou a mensagem de que não foi encontrado (aí só as fórmulas `=cpAnbima…` fi
 >
 > **Principal do vencimento:** nos papéis `IPCA-I` a B3 não cadastra o principal residual quitado no
 > vencimento (FGEN13: os `A` somam 91,975%). A linha do vencimento é completada com `100 − Σ%amort`,
-> então a agenda **sempre fecha 100%**. É valor derivado — validado contra o `trades.db` (FGEN13
+> então a agenda **sempre fecha 100%**. É valor derivado — validado contra a base ANBIMA do secundário (FGEN13
 > 8,025 e MESA13 13,176856, idênticos).
 
-### ANBIMA — referência, taxas indicativas e spread (base local `trades.db`)
-Únicas fórmulas que **não vêm de API**: esses dados só existem na base do projeto de negociação
-secundária, lida em **somente leitura** (o pipeline continua escrevendo nela normalmente).
+### ANBIMA — referência, taxa indicativa e spread (via BTG OTC Markets)
+Desde a **v7.2.0** vêm do cadastro do BTG, que repete o arquivo público da ANBIMA da **última
+divulgação** (a base local que alimentava estas fórmulas deixou de existir). Conferido em 05/11/2026:
+indicativa idêntica à ANBIMA em 1.183 debêntures. Precisa de `token_btg_otc`.
 
 | Função | Retorno |
 |---|---|
-| `=cpAnbimaRef(ticker)` | Vértice/título público de **referência** do papel (ex.: `NTN-B 35`, `DI1F30`) |
-| `=cpAnbimaIndicativo(ticker)` | Taxa indicativa ANBIMA **mais recente** da base, em **decimal** (formate como %) |
-| `=cpAnbimaSpread(ticker)` | **Spread** ANBIMA mais recente sobre essa referência, em **decimal** (`-0,005193` = −51,93 bps) |
-| `=cpAnbimaIndicativoHistorico(ticker)` | Histórico completo (spill): Data · Ticker · Ref · Taxa Indicativa · Spread |
+| `=cpAnbimaRef(ticker)` | Referência do papel: `NTN-B 30` (IPCA+, a NTN-B que a ANBIMA usa) ou `FUNDING` (DI+/%DI). Papel PRÉ → `#N/A` (o BTG não traz a ref DI1) |
+| `=cpAnbimaIndicativo(ticker)` | Taxa indicativa ANBIMA da **última divulgação**, em **decimal** (formate como %) |
+| `=cpAnbimaSpread(ticker)` | **Spread** sobre a referência, em **decimal**. IPCA+: indicativa − taxa da NTN-B de referência (mesma divulgação). `FUNDING`: a própria indicativa |
+| `=cpAnbimaIndicativoHistorico(ticker)` | **Descontinuada** na v7.2.0 (o BTG não tem histórico) — devolve uma mensagem de erro |
 
-> **Unidade:** as taxas **e o spread** saem em **decimal** (7,5983% → `0,075983`), igual a `=cpTaxa`,
-> `=cpTaxaEmissao` e aos indicadores do BCB — formate a célula/coluna como %.
+> **Sem data:** o BTG só entrega a última divulgação da ANBIMA (D-1); não dá para pedir uma data.
 >
-> **Spread com referência `FUNDING` (papéis CDI+ e %CDI):** é a **própria taxa indicativa** — nesses
-> papéis não há benchmark externo a descontar, o spread já *é* a remuneração (CDI+ `0,006967` = CDI +
-> 0,6967%; %CDI `1,029075` = 102,9% do CDI). Nos demais (ref. NTN-B/DI1) é a taxa do papel contra a
-> do vértice.
->
-> **O spread é mais esparso que a taxa** (~1/3 das linhas da base): depende de o papel ter referência
-> cadastrada **e** de haver curva de mercado na data. Por isso `=cpAnbimaSpread` devolve `#N/A` em mais
-> papéis/datas que `=cpAnbimaIndicativo`, e a data do último spread pode ser **anterior** à da última
-> taxa. No histórico, as datas sem spread saem com `#N/A` só nessa coluna.
->
-> **`#N/A` × `ERRO:`** — `#N/A` significa que o papel (ou o indicativo) **não está na base**, que é
-> resposta legítima; `ERRO: …` significa que a **base não foi encontrada/lida** (problema de
-> ambiente: ver `TRADES_DB_PATH` no passo 2). Linhas com taxa nula são ignoradas.
->
-> O histórico vem do mais **recente para o mais antigo**, com a `Data` como data de verdade
-> (ordenável/filtrável no Excel), não texto. As consultas ficam em cache por 5 min —
-> `=cpLimparCache()` força releitura.
+> **`#N/A` × `ERRO:`** — `#N/A` = a ANBIMA não divulga o dado para o papel (ou o BTG não tem o
+> papel; título público nunca está lá). `ERRO: BTG sem resposta — …` = falta `token_btg_otc`, rede
+> ou autenticação.
 
 ### Métricas / gross up (FI Analytics)
 | Função | Retorno |
@@ -271,8 +247,8 @@ fim de semana/feriado e séries mensais). Ex.: `=cpSelic("31/12/2020")` → 2,0.
 ### Diagnóstico
 | Função | Retorno |
 |---|---|
-| `=cpTeste()` | "OK v{versão} — path: … — CALCCP_DIR … — trades.db: …" ou o erro de import |
-| `=cpLimparCache()` | Esvazia o cache das APIs **e o das consultas ao `trades.db`** |
+| `=cpTeste()` | "OK v{versão} — path: … — CALCCP_DIR …" ou o erro de import |
+| `=cpLimparCache()` | Esvazia o cache das APIs |
 
 **Observações:** erros aparecem como texto `ERRO: …` na célula. O 1º cálculo de um papel bate na
 rede (~1–5 s); os demais vêm do cache (disco, 10 min) — `=cpLimparCache()` força atualização.
@@ -303,7 +279,7 @@ renomeia** (senão quebra planilhas e `.xlam` antigos). O **`.xlam` é versionad
 | `file not found: xlwings64-0.36.6.dll` | Python errado / xlwings ≠ 0.36.6 / DLL ausente | ver abaixo |
 | fórmulas não calculam, PC com vários Python | add-in pegou o Python errado | passo 5 (fixar `Interpreter`) |
 | `ERRO: APIs sem resposta (B3/FI)` | faltam env vars / proxy | passo 2 |
-| `ERRO: trades.db não encontrado` nas `=cpAnbima…` | base fora do layout esperado (ou share não mapeada) | setar `TRADES_DB_PATH` com o caminho completo do arquivo (passo 2) e `=cpLimparCache()` |
+| `ERRO: BTG sem resposta` nas `=cpAnbima…` | sem `token_btg_otc`, ou a rede bloqueia o domínio do BTG | setar `token_btg_otc` (passo 2), reabrir o Excel e `=cpLimparCache()` |
 | `#NAME?` só nas `=cpAnbima…` | add-in registrado é o `_v1`/`_v2` (não têm essas fórmulas) | registrar o `CalcCP_v7.xlam` (passo 4) |
 | `#NAME?` só em `=cpAnbimaSpread` (as outras `=cpAnbima…` funcionam) | add-in registrado é o `_v3` — a UDF nova só existe no v4 | registrar o `CalcCP_v7.xlam` (passo 4). A coluna Spread do histórico já funciona no v3, porque depende só dos `.py` |
 | `#NAME?` só em `=cpEmissor` | add-in registrado é o `_v5` ou anterior — a UDF só existe no v6 | registrar o `CalcCP_v7.xlam` (passo 4) |

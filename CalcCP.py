@@ -16,7 +16,7 @@ import xlwings as xw
 # importa: com o Excel aberto durante a atualização, o apis.py antigo ficava na memória e o
 # CalcCP.py novo quebrava no import ("cannot import name 'FluxoFuturo' from 'apis'"), derrubando
 # TODAS as fórmulas. Recarrega os irmãos já carregados (config primeiro: os outros dependem dele).
-for _nome in ("config", "di", "apis", "basedados"):
+for _nome in ("config", "di", "apis"):
     if _nome in sys.modules:
         try:
             importlib.reload(sys.modules[_nome])
@@ -28,7 +28,7 @@ _EXCEL_EPOCH = date_type(1899, 12, 30)
 
 # Versão da lógica (.py). O .xlam é versionado por NOME de arquivo (CalcCP_vN.xlam);
 # a lógica aqui é retrocompatível (só adiciona UDF, nunca remove/renomeia) — ver CHANGELOG.md.
-VERSION = "7.1.2"
+VERSION = "7.2.0"
 
 # Todas as UDFs têm o prefixo cp (ex.: =cpPu, =cpTaxa, =cpVna...).
 # Títulos com API (debênture, CRI/CRA, NTN-B…): via BTG → FI Analytics → B3 → bondbuilder.
@@ -39,20 +39,12 @@ try:
     from apis import (
         Preco, PuPar, Vna, TaxaOp, LimparCache, FatorDi, FonteCalculo, FonteTicker,
         CampoBond, CampoFi, FluxoCadastrado, FluxoFuturo, BcbValor, IpcaIndice,
-        ErroDetalhado, DadoSemTaxa,
+        ErroDetalhado, DadoSemTaxa, CadastroBtg, CampoBtg, UltimoErro,
     )
     import di
 except Exception as _e:
     _IMPORT_ERROR = str(_e)
 
-# Fórmulas ANBIMA: leem o trades.db (negociação secundária) em SOMENTE LEITURA.
-# Import separado de propósito — se a base/módulo faltar, só as fórmulas ANBIMA
-# param; o resto do add-in (que é API) continua funcionando.
-_DB_ERROR = None
-try:
-    import basedados
-except Exception as _e:
-    _DB_ERROR = str(_e)
 
 
 # ─── helpers ─────────────────────────────────────────────────────────────────
@@ -131,34 +123,22 @@ def main():
 # DIAGNÓSTICO
 # =============================================================================
 
-def _diag_banco():
-    """Uma linha sobre o trades.db (fórmulas ANBIMA) para o diagnóstico."""
-    if _DB_ERROR:
-        return f"trades.db: ERRO import ({_DB_ERROR})"
-    try:
-        return basedados.Diagnostico()
-    except Exception as e:
-        return f"trades.db: ERRO ({e})"
-
-
 @xw.func
 def cpTeste():
-    """Diagnóstico: versão, pasta, origem do path e estado do trades.db."""
+    """Diagnóstico: versão, pasta e origem do path."""
     if _IMPORT_ERROR:
         return f"ERRO import: {_IMPORT_ERROR}"
     env = os.environ.get("CALCCP_DIR")
     origem = f"CALCCP_DIR={env}" if env else "CALCCP_DIR não setada (fallback)"
-    return f"OK v{VERSION} — path: {_THIS_DIR} — {origem} — {_diag_banco()}"
+    return f"OK v{VERSION} — path: {_THIS_DIR} — {origem}"
 
 
 @xw.func
 def cpLimparCache():
-    """Esvazia o cache das APIs (BTG/FI/B3/BCB) e o das consultas ao trades.db."""
+    """Esvazia o cache das APIs (BTG/FI/B3/BCB)."""
     if _IMPORT_ERROR:
         return f"ERRO import: {_IMPORT_ERROR}"
     LimparCache()
-    if not _DB_ERROR:
-        basedados.LimparCache()
     return "cache limpo"
 
 
@@ -170,7 +150,7 @@ def Sobre():
     Python de verdade, se a ponte estiver quebrada o erro aparece aqui."""
     import ctypes
     udfs = sorted(n for n, v in globals().items() if n.startswith("cp") and callable(v))
-    estado = f"ERRO no import: {_IMPORT_ERROR}" if _IMPORT_ERROR else "APIs carregadas (B3 / FI / BCB / IBGE)"
+    estado = f"ERRO no import: {_IMPORT_ERROR}" if _IMPORT_ERROR else "APIs carregadas (BTG / FI / B3 / BCB / IBGE)"
     env = os.environ.get("CALCCP_DIR")
     origem = f"CALCCP_DIR = {env}" if env else "CALCCP_DIR não setada (usando fallback do .xlam)"
     texto = (
@@ -179,7 +159,6 @@ def Sobre():
         f"Fórmulas:          {len(udfs)} (todas com prefixo cp)\n"
         f"Estado:            {estado}\n"
         f"Origem do path:    {origem}\n\n"
-        f"{_diag_banco()}\n\n"
         f"Pasta:\n{_THIS_DIR}\n\n"
         f"Python:\n{sys.executable}\n\n"
         f"Guia de uso: abra o COMO_USAR.html que está na pasta acima."
@@ -512,28 +491,35 @@ def cpAniversario(ticker):
 
 @xw.func
 def cpEmissor(ticker):
-    """Nome do emissor do papel (B3 getBondDetails). Em CRI/CRA é a securitizadora."""
+    """Nome do emissor do papel — o RISCO. BTG primeiro: em CRI/CRA ele traz o devedor
+    (ex.: UNIDAS, VIBRA), não a securitizadora. Sem BTG, cai na B3 getBondDetails, que em
+    CRI/CRA devolve a securitizadora."""
     if _IMPORT_ERROR:
         return f"ERRO import: {_IMPORT_ERROR}"
     try:
-        v = CampoBond(str(ticker).upper().strip(), "issuer")
-        return v.strip() if isinstance(v, str) and v.strip() else "ERRO: emissor indisponível"
+        tk = str(ticker).upper().strip()
+        v = CampoBtg(tk, "issuer")
+        if not (isinstance(v, str) and v.strip()):
+            v = CampoBond(tk, "issuer")
+        return v.strip() if isinstance(v, str) and v.strip() else "ERRO: emissor indisponível (BTG/B3)"
     except Exception as e:
         return _erro("emissor", e)
 
 
 # =============================================================================
-# ANBIMA — referência e taxas indicativas (trades.db, SOMENTE LEITURA)
+# ANBIMA — referência, indicativa e spread (via cadastro do BTG OTC Markets)
 # -----------------------------------------------------------------------------
-# Únicas fórmulas que NÃO vêm de API: esses dados só existem na base do projeto
-# de negociação secundária. O caminho do arquivo é descoberto em tempo de
-# execução (config.ResolverTradesDb) — ou fixado na variável TRADES_DB_PATH.
+# Até a v7.1.x estas fórmulas liam uma base local do projeto de negociação
+# secundária, que deixou de existir. Desde a v7.2.0 vêm do cadastro do BTG, que
+# repete o arquivo público da ANBIMA (indicativa, ref NTN-B, taxa da NTN-B de
+# referência) da ÚLTIMA divulgação — conferido em 05/11/2026: indicativa idêntica
+# em 1.183 debêntures. Sem histórico (o BTG não aceita data) e sem a ref DI1 de
+# papel PRÉ.
 #
 # Convenção de retorno:
-#   "#N/A"   → o papel/dado não existe na base (resposta legítima);
-#   "ERRO: " → problema de infraestrutura (base não encontrada, ilegível).
-# As taxas saem em DECIMAL (7,5983% → 0,075983), como nas demais fórmulas de
-# taxa do add-in (=cpTaxa, =cpTaxaEmissao, =cpSelic) — formate a célula como %.
+#   "#N/A"   → o papel/dado não existe no BTG (resposta legítima);
+#   "ERRO: " → o BTG não respondeu (sem token_btg_otc, rede, auth).
+# As taxas saem em DECIMAL (7,5983% → 0,075983) — formate a célula como %.
 # =============================================================================
 
 def _taxa_decimal(taxa):
@@ -541,95 +527,92 @@ def _taxa_decimal(taxa):
     return float(f"{float(taxa) / 100:.10g}")
 
 
-def _db_indisponivel():
-    """Mensagem de erro se a camada de base não puder ser usada; senão None."""
-    if _DB_ERROR:
-        return f"ERRO import: {_DB_ERROR}"
+def _cadastro_btg(ticker):
+    """(cadastro, erro): cadastro do BTG do papel, ou a mensagem de erro pronta p/ o Excel."""
+    cad = CadastroBtg(str(ticker).upper().strip())
+    if cad is None:
+        motivo = UltimoErro()
+        return None, "ERRO: BTG sem resposta" + (f" — {motivo}" if motivo else "")
+    return cad, None
+
+
+def _vazio_btg(v):
+    return v is None or str(v).strip() in ("", "-", "--", "nan", "None")
+
+
+def _ref_btg(cad):
+    """Referência no estilo de antes: 'NTN-B 30' (IPCA+), 'FUNDING' (DI+/%DI) ou None."""
+    ref = cad.get("ntnb_reference")
+    if not _vazio_btg(ref):
+        return f"NTN-B {str(ref)[2:4]}"
+    if cad.get("linked_index") in ("DI+", "%DI"):
+        return "FUNDING"
     return None
 
 
 @xw.func
 def cpAnbimaRef(ticker):
-    """Vértice/título público de REFERÊNCIA cadastrado para o papel
-    (ex.: "NTN-B 35", "DI1F29"). Fonte: trades.db (InfoAtivos.cdReferencia).
-    Devolve #N/A se o papel não estiver na base ou não tiver referência."""
-    erro = _db_indisponivel()
-    if erro:
-        return erro
+    """Referência do papel: "NTN-B 30" (IPCA+, a NTN-B que a ANBIMA usa) ou "FUNDING"
+    (DI+/%DI, sem benchmark externo). Fonte: BTG (espelho do arquivo ANBIMA).
+    #N/A se o papel não tiver referência (ex.: PRÉ, cuja ref DI1 o BTG não traz)."""
+    if _IMPORT_ERROR:
+        return f"ERRO import: {_IMPORT_ERROR}"
     try:
-        ref = basedados.ReferenciaAnbima(ticker)
-        return ref if ref else _NA
-    except basedados.BancoIndisponivel as e:
-        return f"ERRO: {e}"
+        cad, erro = _cadastro_btg(ticker)
+        if erro:
+            return erro
+        return _ref_btg(cad) or _NA
     except Exception as e:
         return _erro("anbimaRef", e)
 
 
 @xw.func
 def cpAnbimaIndicativo(ticker):
-    """Taxa indicativa ANBIMA mais RECENTE disponível na base para o papel, em
-    DECIMAL (formate a célula como %). Fonte: trades.db (AnbimaIndicativos).
-    Devolve #N/A se o papel não tiver indicativo publicado.
-    (O histórico com as datas está em =cpAnbimaIndicativoHistorico.)"""
-    erro = _db_indisponivel()
-    if erro:
-        return erro
+    """Taxa indicativa ANBIMA da ÚLTIMA divulgação, em DECIMAL (formate como %).
+    Fonte: BTG (campo target_price = coluna "Taxa Indi. Anbima" da plataforma).
+    #N/A se a ANBIMA não divulga indicativa para o papel."""
+    if _IMPORT_ERROR:
+        return f"ERRO import: {_IMPORT_ERROR}"
     try:
-        ind = basedados.IndicativoAnbima(ticker)
-        return _taxa_decimal(ind["taxa"]) if ind else _NA
-    except basedados.BancoIndisponivel as e:
-        return f"ERRO: {e}"
+        cad, erro = _cadastro_btg(ticker)
+        if erro:
+            return erro
+        ind = cad.get("target_price")
+        return _NA if _vazio_btg(ind) else _taxa_decimal(ind)
     except Exception as e:
         return _erro("anbimaInd", e)
 
 
 @xw.func
 def cpAnbimaSpread(ticker):
-    """Spread ANBIMA mais RECENTE disponível na base para o papel, sobre a
-    referência de =cpAnbimaRef, em DECIMAL (formate a célula como %; -0,5193%
-    = -51,93 bps). Fonte: trades.db (AnbimaIndicativos.vrSpreadAnbima).
-    Quando a referência é FUNDING (CDI+/%CDI) o spread É a própria taxa
-    indicativa — não há benchmark externo para descontar.
-    Devolve #N/A se o papel não tiver spread calculado (é mais esparso que a
-    taxa: exige referência cadastrada e curva de MtM na data).
-    (O histórico com as datas está em =cpAnbimaIndicativoHistorico.)"""
-    erro = _db_indisponivel()
-    if erro:
-        return erro
+    """Spread da indicativa ANBIMA sobre a referência de =cpAnbimaRef, em DECIMAL
+    (-0,005193 = -51,93 bps). IPCA+: indicativa − taxa da NTN-B de referência (as duas da
+    mesma divulgação ANBIMA, via BTG). DI+/%DI (FUNDING): o spread É a própria indicativa.
+    #N/A se faltar a indicativa ou a referência."""
+    if _IMPORT_ERROR:
+        return f"ERRO import: {_IMPORT_ERROR}"
     try:
-        spr = basedados.SpreadAnbima(ticker)
-        return _taxa_decimal(spr["spread"]) if spr else _NA
-    except basedados.BancoIndisponivel as e:
-        return f"ERRO: {e}"
+        cad, erro = _cadastro_btg(ticker)
+        if erro:
+            return erro
+        ind, ref = cad.get("target_price"), _ref_btg(cad)
+        if _vazio_btg(ind) or ref is None:
+            return _NA
+        if ref == "FUNDING":
+            return _taxa_decimal(ind)
+        ntnb = cad.get("ntnb_target_price")
+        if _vazio_btg(ntnb):
+            return _NA
+        return float(f"{(float(ind) - float(ntnb)) / 100:.10g}")
     except Exception as e:
         return _erro("anbimaSpread", e)
 
 
 @xw.func
 def cpAnbimaIndicativoHistorico(ticker):
-    """Histórico COMPLETO de indicativos ANBIMA do papel (spill), do mais recente
-    para o mais antigo: Data | Ticker | Ref | Taxa Indicativa | Spread.
-    Taxa e spread em DECIMAL (formate as colunas como %). Fonte: trades.db.
-    A coluna Spread sai #N/A nas datas sem spread calculado."""
-    erro = _db_indisponivel()
-    if erro:
-        return erro
-    try:
-        linhas = basedados.HistoricoIndicativoAnbima(ticker)
-        if not linhas:
-            return _NA
-        saida = [["Data", "Ticker", "Ref", "Taxa Indicativa", "Spread"]]
-        for l in linhas:
-            spread = l["spread"]
-            saida.append([
-                _data_saida(l["data"]), l["ticker"], l["ref"], _taxa_decimal(l["taxa"]),
-                _NA if spread is None else _taxa_decimal(spread),
-            ])
-        return saida
-    except basedados.BancoIndisponivel as e:
-        return f"ERRO: {e}"
-    except Exception as e:
-        return f"ERRO: {e}"
+    """DESCONTINUADA na v7.2.0: o histórico vinha de uma base local que deixou de existir,
+    e o BTG só tem a última divulgação. Use =cpAnbimaIndicativo / =cpAnbimaSpread."""
+    return "ERRO: histórico descontinuado (a base local saiu na v7.2.0) — use =cpAnbimaIndicativo"
 
 
 # =============================================================================

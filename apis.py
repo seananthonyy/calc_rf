@@ -510,6 +510,43 @@ def TaxaBtg(ticker, dataIso, pu):
     _CacheSet(chaveCache, resultado)
     return resultado
 
+_VAZIOS_BTG = {None, "", "-", "--", "nan", "None"}
+
+
+def CadastroBtg(ticker):
+    """Linha do cadastro do BTG (/mktdata/instrument/all?symbols=) do papel.
+
+    dict com os campos do papel; {} se o BTG não conhece o papel; None se a chamada falhou
+    (motivo em UltimoErro()). Os campos de mercado (indicativa ANBIMA, ref NTN-B) são os da
+    última divulgação da ANBIMA — o BTG não aceita data. Título público não está lá."""
+    tk = str(ticker).upper().strip()
+    if _EhTituloPublico(tk):
+        return {}
+    chave = ("btgcad", tk)
+    c = _CacheGet(chave)
+    if c is not _CACHE_AUSENTE:
+        return c
+    _Falhou(None)
+    dados = _GetBtg("mktdata/instrument/all", {"pagination": "False", "symbols": tk})
+    if dados is None:
+        return None                         # falha de rede/auth: não cacheia, tenta de novo depois
+    res = dados if isinstance(dados, dict) and str(dados.get("symbol", "")).upper() == tk else {}
+    _CacheSet(chave, res)
+    return res
+
+
+def CampoBtg(ticker, campo):
+    """Um campo do cadastro do BTG, com os marcadores de vazio ('-', '--', 'nan') como None."""
+    cad = CadastroBtg(ticker)
+    v = cad.get(campo) if isinstance(cad, dict) else None
+    return None if v in _VAZIOS_BTG or (isinstance(v, str) and v.strip() in _VAZIOS_BTG) else v
+
+
+def UltimoErro():
+    """Motivo da última falha de rede registrada (texto) ou None."""
+    return _ultimoErro
+
+
 # -----------------------------------------------------------------------------
 # B3 Calculator
 # -----------------------------------------------------------------------------

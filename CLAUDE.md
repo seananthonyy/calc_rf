@@ -4,6 +4,18 @@
 
 Documentação técnica para o Claude Code. Leia antes de alterar qualquer coisa nesta pasta.
 
+> ## 🟢 ATUALIZAÇÃO 05/11/2026 (2) — v7.2.0: sai o `trades.db`; `cpAnbima*` e `cpEmissor` via BTG (só `.py`)
+> - O `trades.db` do secundário **não existe mais** (o projeto migrou para Parquet). Removidos: `basedados.py`,
+>   `config.ResolverTradesDb`, `TRADES_DB_PATH`, o `_DB_ERROR`/`_diag_banco` do `CalcCP.py` e o arquivo do bundle.
+>   Os banners antigos abaixo que falam do `trades.db` são HISTÓRICO.
+> - `apis.CadastroBtg(tk)` = `GET /mktdata/instrument/all?pagination=False&symbols=TK` → dict (`{}` = BTG não
+>   conhece; `None` = falha, motivo em `apis.UltimoErro()`), cache `("btgcad", tk)` 10 min. `CampoBtg` trata
+>   `-`/`--`/`nan` como None. O cadastro espelha o arquivo ANBIMA de debêntures da última divulgação:
+>   `target_price`=indicativa, `ntnb_reference`, `ntnb_target_price` (taxa da NTN-B ref), `tax_exempt` S/N.
+> - `cpAnbimaRef` = `NTN-B yy` | `FUNDING` (DI+/%DI) | #N/A; `cpAnbimaSpread` IPCA+ = indicativa − ntnb_target_price;
+>   `cpAnbimaIndicativoHistorico` devolve erro fixo (continua registrada no `.xlam`, sem re-bake).
+> - `cpEmissor`: BTG → B3. Decisão do usuário: o devedor (BTG) importa, a securitizadora (B3) não.
+>
 > ## 🟢 ATUALIZAÇÃO 05/11/2026 — v7.1.0: BTG OTC Markets em 1º; ordem BTG → FI → B3 → bb (só `.py`)
 > - `apis._ORDEM_FONTES = ["btg", "fi", "b3", "bb"]` usado por `Preco`/`TaxaOp`/`PuPar`/`DadoSemTaxa`.
 >   `FluxoFuturo` = `["fi", "b3"]` (BTG não tem fluxo). Decisão do usuário.
@@ -263,11 +275,10 @@ Depois de instalado, a aba do ribbon aparece como **CalcCP**.
 | Arquivo | Papel | Mexe? |
 |---|---|---|
 | `CalcCP.py` | as UDFs (`@xw.func`). Roteia DI→`di.py`, resto→`apis.py`. | sim — lógica das funções |
-| `apis.py` | cliente HTTP B3/FI (urllib, stdlib). Segredos + proxy + cache + normaliza NTN-B/F. | sim — APIs, proxy, parsing |
+| `apis.py` | cliente HTTP BTG/FI/B3/BCB (urllib, stdlib). Segredos + proxy + cache + normaliza NTN-B/F. | sim — APIs, proxy, parsing |
 | `di.py` | cálculo LOCAL de DI (DI1...). Self-contained (lê `feriados_anbima.csv`). | sim — fórmula/calendário DI |
-| `basedados.py` | leitura SOMENTE-LEITURA do `trades.db` (fórmulas ANBIMA). Só `sqlite3`. | sim — consultas ANBIMA |
 | `feriados_anbima.csv` | calendário de feriados (usado pelo `di.py`). | só ao estender datas |
-| `config.py` | `ENV_PATH` (fallback de dev) + `ResolverTradesDb()` (descoberta do `trades.db`). | raramente |
+| `config.py` | `ENV_PATH` (fallback de dev). | raramente |
 | `CalcCP.xlam` | o add-in. Binário. | só ao mudar nome/assinatura de UDF (ver abaixo) |
 
 ## Segredos e proxy — via VARIÁVEIS DE AMBIENTE
@@ -456,16 +467,14 @@ ALTERAR" (2)). Paliativo enquanto não atualiza: cálculo em **Manual (F9)**.
    identificadores de máquina/usuário. Segredos vêm SÓ de variáveis de ambiente. Antes de
    entregar/alterar, varra a pasta atrás de valores reais de credenciais e remova.
 3. Não reintroduza a calculadora ANBIMA local nem faça o add-in depender de base local **para o que
-   já tem API**. **Exceções intencionais** (dado que NÃO existe em API): o DI, calculado em `di.py`,
-   e o `trades.db`, lido em `basedados.py` pelas fórmulas `cpAnbima*`. Nos dois casos: sem escrita
-   (SQLite aberto com `?mode=ro`), sem o caminho embutido no código, e degradando sozinho — se a
-   base sumir, só essas fórmulas param, com mensagem explícita.
+   já tem API**. **Exceção intencional:** o DI, calculado em `di.py`. (Até a v7.1.x as `cpAnbima*` liam
+   o `trades.db`; desde a v7.2.0 vêm do BTG e o add-in não lê nenhuma base local.)
 4. `apis.py` usa só a stdlib (urllib). Evite adicionar dependências (mantém o deploy leve).
 
 ## Teste rápido (sanity)
 ```
-python -c "import CalcCP as m; print(m.cpTeste()); print(m.cpPu('FGEN13','13/06/2025',0.064686)); print(m.cpAnbimaRef('FGEN13'), m.cpAnbimaIndicativo('FGEN13'))"
+python -c "import CalcCP as m; print(m.cpTeste()); print(m.cpPu('FGEN13','13/06/2025',0.064686)); print(m.cpAnbimaRef('CEAP12'), m.cpAnbimaIndicativo('CEAP12'))"
 ```
-Esperado: `OK v<versão> — path: <esta pasta> — … — trades.db: OK (ANBIMA até <data>)`, `961.699686`
-(com as env vars/`.env` resolvendo os segredos) e `NTN-B 27 0.075983` (valor de 17/07/2026 —
-a taxa muda conforme a base for atualizada; o que importa é vir número, não `#N/A`/`ERRO`).
+Esperado: `OK v<versão> — path: <esta pasta> — …`, `961.699686` (com as env vars resolvendo os segredos)
+e `NTN-B 30 0.081227` (valor de 05/11/2026 — muda a cada divulgação ANBIMA; o que importa é vir número,
+não `#N/A`/`ERRO`).
