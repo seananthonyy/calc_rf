@@ -201,7 +201,6 @@ indicativa idêntica à ANBIMA em 1.183 debêntures. Precisa de `token_btg_otc`.
 | `=cpAnbimaRef(ticker)` | Referência do papel: `NTN-B 30` (IPCA+, a NTN-B que a ANBIMA usa) ou `FUNDING` (DI+/%DI). Papel PRÉ → `#N/A` (o BTG não traz a ref DI1) |
 | `=cpAnbimaIndicativo(ticker)` | Taxa indicativa ANBIMA da **última divulgação**, em **decimal** (formate como %) |
 | `=cpAnbimaSpread(ticker)` | **Spread** sobre a referência, em **decimal**. IPCA+: indicativa − taxa da NTN-B de referência (mesma divulgação). `FUNDING`: a própria indicativa |
-| `=cpAnbimaIndicativoHistorico(ticker)` | **Descontinuada** na v7.2.0 (o BTG não tem histórico) — devolve uma mensagem de erro |
 
 > **Sem data:** o BTG só entrega a última divulgação da ANBIMA (D-1); não dá para pedir uma data.
 >

@@ -12,8 +12,10 @@ Documentação técnica para o Claude Code. Leia antes de alterar qualquer coisa
 >   conhece; `None` = falha, motivo em `apis.UltimoErro()`), cache `("btgcad", tk)` 10 min. `CampoBtg` trata
 >   `-`/`--`/`nan` como None. O cadastro espelha o arquivo ANBIMA de debêntures da última divulgação:
 >   `target_price`=indicativa, `ntnb_reference`, `ntnb_target_price` (taxa da NTN-B ref), `tax_exempt` S/N.
-> - `cpAnbimaRef` = `NTN-B yy` | `FUNDING` (DI+/%DI) | #N/A; `cpAnbimaSpread` IPCA+ = indicativa − ntnb_target_price;
->   `cpAnbimaIndicativoHistorico` devolve erro fixo (continua registrada no `.xlam`, sem re-bake).
+> - `cpAnbimaRef` = `NTN-B yy` | `FUNDING` (DI+/%DI) | #N/A; `cpAnbimaSpread` IPCA+ = indicativa − ntnb_target_price
+>   (= indicativa ANBIMA da NTN-B de referência, conferida igual ao arquivo MtM ANBIMA de 04/11 em todos os vértices).
+> - v7.2.1: `cpAnbimaIndicativoHistorico` REMOVIDA do `.py` (pedido do usuário). O stub ainda existe no
+>   `CalcCP_v7.xlam` → no próximo re-bake ela sai da lista (remover `xlwings_udfs` antes, como sempre).
 > - `cpEmissor`: BTG → B3. Decisão do usuário: o devedor (BTG) importa, a securitizadora (B3) não.
 >
 > ## 🟢 ATUALIZAÇÃO 05/11/2026 — v7.1.0: BTG OTC Markets em 1º; ordem BTG → FI → B3 → bb (só `.py`)

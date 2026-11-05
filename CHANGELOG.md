@@ -4,6 +4,12 @@ Versionamento: a **lógica** (`.py`) é retrocompatível; o **`.xlam` é version
 (`CalcCP_vN.xlam`) — versões antigas ficam na share e não quebram quem já usa.
 `VERSION` no `CalcCP.py` acompanha a lógica.
 
+## v7.2.1 — 2026-11-05 — sai `=cpAnbimaIndicativoHistorico` (só lógica; **sem re-bake**)
+
+- A fórmula foi **removida** do código (pedido do usuário): não há fonte de histórico de indicativas.
+  O nome ainda aparece no Excel enquanto o `.xlam` registrado for o `CalcCP_v7.xlam`; uma célula que a
+  use passa a dar erro do xlwings. Some de vez no próximo re-bake.
+
 ## v7.2.0 — 2026-11-05 — sai a base local; `cpEmissor` e `cpAnbima*` passam a vir do BTG (só lógica; **sem re-bake**)
 
 - **Saiu tudo que lia a base local do projeto de negociação secundária** (`trades.db`, que deixou de
